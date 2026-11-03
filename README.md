@@ -1,98 +1,118 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend App
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Бэкенд на NestJS, TypeORM и PostgreSQL. Сейчас реализована регистрация по email и паролю с необязательным подтверждением почты кодом или ссылкой.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Требования
 
-## Description
+- Node.js 24.9 или новее: более старые версии не подойдут для e2e-тестов
+- Docker с Docker Compose
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Запуск
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env
 ```
 
-## Compile and run the project
+В `.env` замени `CONFIRMATION_HMAC_SECRET` на случайное значение:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+openssl rand -hex 32
 ```
 
-## Run tests
+Затем подними Postgres и Mailpit, создай таблицы и запусти приложение:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d
+npm run migration:run
+npm run start:dev
 ```
 
-## Deployment
+При настройках из `.env.example` будут доступны:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Что | Адрес |
+| --- | --- |
+| API | http://localhost:3200 |
+| Swagger | http://localhost:3200/api/docs |
+| Mailpit (входящие письма) | http://localhost:8025 |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Настройки
+
+Все значения задаются в `.env`, пример лежит в `.env.example`.
+
+| Переменная | Описание |
+| --- | --- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Подключение к Postgres, их же использует `docker-compose.yml` |
+| `DB_HOST` | Хост Postgres |
+| `PORT` | Порт приложения |
+| `APP_URL` | Адрес приложения, подставляется в ссылку из письма |
+| `REGISTRATION_CONFIRM_ENABLED` | `true` — нужно подтверждение, `false` — аккаунт сразу активен |
+| `REGISTRATION_CONFIRM_METHOD` | Способ подтверждения: `otp` или `magic_link` |
+| `REGISTRATION_RATE_LIMIT`, `REGISTRATION_RATE_TTL_SECONDS` | Не больше `LIMIT` запросов за `TTL` секунд, отдельно для регистрации и повторной отправки |
+| `CONFIRMATION_HMAC_SECRET` | Ключ HMAC для кодов и токенов из писем |
+| `SMTP_HOST`, `SMTP_PORT`, `MAIL_FROM` | Отправка почты |
+
+## Регистрация
+
+| Запрос | Тело | Успешный ответ |
+| --- | --- | --- |
+| `POST /auth/register` | `email`, `password`, необязательный `name` | `201` — аккаунт активен, `202` — ждёт подтверждения |
+| `POST /auth/register/confirm` | `attemptId` и `code` либо `token` | `200` — аккаунт активен |
+| `POST /auth/register/resend` | `email` | `202` — письмо отправлено заново |
+| `GET /auth/register/confirm?token=...` | — | `200` — страница с кнопкой подтверждения |
+
+Открытие ссылки из письма статус не меняет: почтовые сканеры и превью сами открывают ссылки через GET. Аккаунт активирует POST по нажатию кнопки на странице.
+
+Код и ссылка действуют 10 минут. Для кода разрешено 5 вводов, повторно запросить письмо можно раз в 60 секунд.
+
+Ошибки:
+
+| Код | Когда |
+| --- | --- |
+| `400` | Некорректные данные; неверный или просроченный код или токен; попытка не найдена или уже использована |
+| `409` | Email уже зарегистрирован, в том числе ожидает подтверждения |
+| `429` | Исчерпаны вводы кода, письмо запрошено раньше 60 секунд, слишком частые запросы |
+| `503` | Письмо не отправлено. Аккаунт и попытка сохранены, письмо можно запросить заново через `/resend` |
+
+### Пример с кодом
+
+При `REGISTRATION_CONFIRM_METHOD=otp`:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+curl -i http://localhost:3200/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"user@example.com","password":"Passw0rd"}'
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Возьми `attemptId` из ответа и код из письма в Mailpit:
 
-## Resources
+```bash
+curl -i http://localhost:3200/auth/register/confirm \
+  -H 'Content-Type: application/json' \
+  -d '{"attemptId":"<attemptId>","code":"<код>"}'
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### Пример со ссылкой
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Поставь `REGISTRATION_CONFIRM_METHOD=magic_link`, перезапусти приложение и зарегистрируй новый email. Затем открой ссылку из письма в Mailpit и нажми кнопку на странице.
 
-## Support
+## Миграции
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Схема базы меняется только миграциями, автоматическая синхронизация выключена.
 
-## Stay in touch
+```bash
+npm run migration:run      # применить новые миграции
+npm run migration:show     # показать статус миграций
+npm run migration:revert   # откатить последнюю миграцию
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Новую миграцию нужно добавить в массив `migrations` в `src/data-source.ts`, иначе CLI её не увидит.
 
-## License
+## Тесты
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+npm test            # unit-тесты, база не нужна
+npm run test:e2e    # e2e-тесты, нужен запущенный Postgres
+```
+
+E2E-тесты работают с отдельной базой `backend_app_test` и пересоздают её при каждом запуске, рабочая база не затрагивается. Почта в них заменена фейком, поэтому Mailpit не нужен.
