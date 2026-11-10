@@ -6,6 +6,13 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 
+export type UserStatus =
+  | "pending"
+  | "active"
+  | "blocked"
+  | "deleting"
+  | "deleted";
+
 @Entity("users")
 export class User {
   @PrimaryGeneratedColumn("uuid")
@@ -18,7 +25,7 @@ export class User {
   name: string | null;
 
   @Column({ type: "varchar", length: 20 })
-  status: "active" | "pending";
+  status: UserStatus;
 
   @Column({ name: "password_hash", type: "varchar", length: 250 })
   passwordHash: string;

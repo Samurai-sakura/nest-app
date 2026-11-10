@@ -15,11 +15,11 @@ jest.mock("@nestjs/config", () => ({ ConfigService: class {} }));
 jest.mock("@nestjs/typeorm", () => ({
   InjectRepository: () => () => undefined,
 }));
-jest.mock("../mail/mail.service", () => ({ MailService: class {} }));
+jest.mock("../../mail/mail.service", () => ({ MailService: class {} }));
 
 import { AuthService } from "./auth.service";
-import { User } from "./entities/user.entity";
-import { RegistrationConfirmation } from "./entities/registration-confirmation.entity";
+import { User } from "../entities/user.entity";
+import { RegistrationConfirmation } from "../entities/registration-confirmation.entity";
 
 const HMAC_SECRET = "test-secret";
 const hmac = (value: string) =>

@@ -12,15 +12,15 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, IsNull, QueryFailedError, Repository } from "typeorm";
 import { createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import * as argon2 from "argon2";
-import { UserRegisterDto } from "./dto/user-register.dto";
-import { ConfirmRegistrationDto } from "./dto/confirm-registration.dto";
-import { ResendConfirmationDto } from "./dto/resend-confirmation.dto";
-import { User } from "./entities/user.entity";
+import { UserRegisterDto } from "../dto/user-register.dto";
+import { ConfirmRegistrationDto } from "../dto/confirm-registration.dto";
+import { ResendConfirmationDto } from "../dto/resend-confirmation.dto";
+import { User } from "../entities/user.entity";
 import {
   ConfirmationMethod,
   RegistrationConfirmation,
-} from "./entities/registration-confirmation.entity";
-import { MailService } from "../mail/mail.service";
+} from "../entities/registration-confirmation.entity";
+import { MailService } from "../../mail/mail.service";
 
 const CONFIRMATION_TTL_SECONDS = 600;
 const RESEND_AFTER_SECONDS = 60;
@@ -115,7 +115,11 @@ export class AuthService {
       this.logger.error(
         `Confirmation send failed attemptId=${attempt.id} method=${method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException("Failed to send confirmation email");
+      throw new ServiceUnavailableException({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: "email_delivery_failed",
+        message: "Failed to send confirmation email",
+      });
     }
 
     await this.confirmationRepository.update(attempt.id, {
@@ -170,14 +174,22 @@ export class AuthService {
 
     if (result.status === "no_pending") {
       this.logger.warn("Resend rejected reason=no_pending");
-      throw new BadRequestException("No pending confirmation for this email");
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: "no_pending_confirmation",
+        message: "No pending confirmation for this email",
+      });
     }
     if (result.status === "too_early") {
       this.logger.warn(
         `Resend rejected reason=too_early attemptId=${result.attemptId}`,
       );
       throw new HttpException(
-        "Resend is allowed once per 60 seconds",
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          code: "resend_too_early",
+          message: "Resend is allowed once per 60 seconds",
+        },
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
@@ -193,7 +205,11 @@ export class AuthService {
       this.logger.error(
         `Confirmation send failed attemptId=${attempt.id} method=${attempt.method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException("Failed to send confirmation email");
+      throw new ServiceUnavailableException({
+        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+        code: "email_delivery_failed",
+        message: "Failed to send confirmation email",
+      });
     }
 
     this.logger.log(
@@ -296,10 +312,21 @@ export class AuthService {
 
     // клиенту причины не различаем: всё, кроме исчерпанного лимита, — одинаковый 400
     if (result.status === "exhausted") {
-      throw new HttpException("Too many attempts", HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          code: "attempts_exhausted",
+          message: "Too many attempts",
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     if (result.status !== "ok") {
-      throw new BadRequestException("Invalid or expired confirmation code");
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        code: "invalid_confirmation",
+        message: "Invalid or expired confirmation code",
+      });
     }
 
     this.logger.log(
@@ -343,7 +370,11 @@ export class AuthService {
   private throwIfEmailTaken(error: unknown) {
     if (error instanceof QueryFailedError && (error as any).code === "23505") {
       this.logger.warn("Registration rejected: email already registered");
-      throw new ConflictException("Email already registered");
+      throw new ConflictException({
+        statusCode: HttpStatus.CONFLICT,
+        code: "email_taken",
+        message: "Email already registered",
+      });
     }
   }
 }
