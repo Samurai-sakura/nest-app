@@ -1,11 +1,8 @@
-import { INestApplication, Logger, ValidationPipe } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
+import { INestApplication, Logger } from "@nestjs/common";
 import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
-import { AppModule } from "../src/app.module";
-import { MailService } from "../src/mail/mail.service";
-import { TEST_DB } from "./setup-env";
+import { createTestApp } from "./helpers/create-test-app";
 
 const password = "Passw0rd-secret";
 const email = "abc@gmail.com";
@@ -17,20 +14,7 @@ describe("Registration (e2e)", () => {
   let db: DataSource;
 
   async function createApp() {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(MailService)
-      .useValue(mail)
-      .compile();
-
-    const created = moduleRef.createNestApplication();
-    created.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    await created.init();
-
-    const dataSource = created.get(DataSource);
-    if (dataSource.options.database !== TEST_DB) {
-      throw new Error(`e2e tests must not run on ${dataSource.options.database}`);
-    }
-    return created;
+    return (await createTestApp({ mail })).app;
   }
 
   const http = () => request(app.getHttpServer());

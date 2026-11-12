@@ -33,4 +33,22 @@ export class MailService {
       text: `Перейдите по ссылке, чтобы подтвердить email: ${link}\nСсылка действует 10 минут.`,
     });
   }
+
+  public async sendLoginOtp(to: string, code: string) {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: "Код для входа",
+      text: `Ваш код для входа: ${code}. Действует 10 минут.\nЕсли вы не входили, смените пароль.`,
+    });
+  }
+
+  public async sendLoginMagicLink(to: string, link: string) {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: "Ссылка для входа",
+      text: `Перейдите по ссылке, чтобы войти: ${link}\nСсылка действует 10 минут.\nЕсли вы не входили, смените пароль.`,
+    });
+  }
 }

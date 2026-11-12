@@ -6,12 +6,14 @@ import {
 } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { ThrottlerException, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_FILTER } from "@nestjs/core";
+import { HttpExceptionFilter } from "../common/filters/http-exception.filter";
 import request from "supertest";
 
-jest.mock("./auth.service", () => ({ AuthService: class {} }));
+jest.mock("./services/auth.service", () => ({ AuthService: class {} }));
 
 import { AuthController } from "./auth.controller";
-import { AuthService } from "./auth.service";
+import { AuthService } from "./services/auth.service";
 
 const attemptId = "3f2b8c1e-7a4d-4e6b-9c0a-1d2e3f4a5b6c";
 
@@ -27,7 +29,10 @@ describe("AuthController", () => {
     guard = { canActivate: jest.fn(() => true) };
     const moduleRef = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: authService }],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: APP_FILTER, useClass: HttpExceptionFilter },
+      ],
     })
       .overrideGuard(ThrottlerGuard)
       .useValue(guard)

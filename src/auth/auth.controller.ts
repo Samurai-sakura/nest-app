@@ -6,7 +6,6 @@ import {
   HttpCode,
   Post,
   Res,
-  UseFilters,
   UseGuards,
 } from "@nestjs/common";
 import {
@@ -24,9 +23,8 @@ import {
 } from "@nestjs/swagger";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import type { Response } from "express";
-import { AuthRejectionFilter } from "./auth-rejection.filter";
-import { AuthService } from "./auth.service";
-import { CONFIRM_PAGE_HTML } from "./confirm-page";
+import { AuthService } from "./services/auth.service";
+import { CONFIRM_PAGE_HTML } from "./helpers/confirm-page";
 import { UserRegisterDto } from "./dto/user-register.dto";
 import { ConfirmRegistrationDto } from "./dto/confirm-registration.dto";
 import { ResendConfirmationDto } from "./dto/resend-confirmation.dto";
@@ -37,8 +35,7 @@ import {
   RegisteredUserResponse,
 } from "./dto/auth-responses.dto";
 
-@ApiTags("auth")
-@UseFilters(AuthRejectionFilter)
+@ApiTags("Register")
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

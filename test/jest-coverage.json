@@ -1,0 +1,16 @@
+{
+  "rootDir": "..",
+  "collectCoverageFrom": [
+    "src/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/main.ts",
+    "!src/data-source.ts",
+    "!src/migrations/**"
+  ],
+  "coverageDirectory": "<rootDir>/coverage",
+  "coverageReporters": ["text-summary", "text", "html"],
+  "coverageThreshold": {
+    "global": { "statements": 80, "branches": 80, "functions": 80, "lines": 80 }
+  },
+  "projects": ["<rootDir>/test/jest-unit.json", "<rootDir>/test/jest-e2e.json"]
+}
