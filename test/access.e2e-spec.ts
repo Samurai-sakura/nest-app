@@ -4,16 +4,16 @@ import {
   INestApplication,
   Logger,
   Post,
-  UseGuards,
 } from "@nestjs/common";
 import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
 import * as jwt from "jsonwebtoken";
 import { AuthModule } from "../src/auth/auth.module";
-import { AccessGuard } from "../src/auth/guards/access.guard";
-import { CurrentUserId } from "../src/auth/decorators/current-user-id.decorator";
+import { CurrentUserId } from "../src/authorization/decorators/current-user-id.decorator";
+import { RequirePermission } from "../src/authorization/decorators/require-permission.decorator";
 import { createTestApp } from "./helpers/create-test-app";
+import { grantPermission, resetRbac } from "./helpers/rbac";
 
 const email = "abc@gmail.com";
 const password = "Passw0rd-secret";
@@ -21,15 +21,16 @@ const handler = jest.fn();
 
 // защищённых операций в задании входа нет: маршрут существует только в тесте
 @Controller("test-protected")
-@UseGuards(AccessGuard)
 class ProtectedController {
   @Get()
+  @RequirePermission("test", "read")
   public me(@CurrentUserId() userId: string) {
     handler(userId);
     return { userId };
   }
 
   @Post()
+  @RequirePermission("test", "write")
   public change(@CurrentUserId() userId: string) {
     handler(userId);
     return { userId };
@@ -67,6 +68,8 @@ describe("Access check (e2e)", () => {
       [email, await argon2.hash(password)],
     );
     userId = id;
+    await resetRbac(db);
+    await grantPermission(db, userId, "test", ["read", "write"]);
   });
 
   const http = () => request(app.getHttpServer());

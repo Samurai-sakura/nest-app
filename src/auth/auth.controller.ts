@@ -34,8 +34,10 @@ import {
   ErrorResponse,
   RegisteredUserResponse,
 } from "./dto/auth-responses.dto";
+import { Public } from "../authorization/decorators/public.decorator";
 
 @ApiTags("Register")
+@Public()
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

@@ -7,6 +7,14 @@ import {
   CreateAuthTablesMigration,
 } from "./migrations/create-auth-tables.migration";
 import { CreateLoginChallengesMigration } from "./migrations/create-login-challenges.migration";
+import { CreateRbacTablesMigration } from "./migrations/create-rbac-tables.migration";
+import { Role } from "./rbac/entities/role.entity";
+import { Permission } from "./rbac/entities/permission.entity";
+import { PermissionAction } from "./rbac/entities/permission-action.entity";
+import { Grant } from "./rbac/entities/grant.entity";
+import { GrantAction } from "./rbac/entities/grant-action.entity";
+import { UserRole } from "./rbac/entities/user-role.entity";
+import { RbacPolicyState } from "./rbac/entities/rbac-policy-state.entity";
 
 if (existsSync(".env")) {
   process.loadEnvFile(".env");
@@ -19,6 +27,21 @@ export default new DataSource({
   username: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   database: process.env.POSTGRES_DB,
-  entities: [User, RegistrationConfirmation, LoginChallenge],
-  migrations: [CreateAuthTablesMigration, CreateLoginChallengesMigration],
+  entities: [
+    User,
+    RegistrationConfirmation,
+    LoginChallenge,
+    Role,
+    Permission,
+    PermissionAction,
+    Grant,
+    GrantAction,
+    UserRole,
+    RbacPolicyState,
+  ],
+  migrations: [
+    CreateAuthTablesMigration,
+    CreateLoginChallengesMigration,
+    CreateRbacTablesMigration,
+  ],
 });

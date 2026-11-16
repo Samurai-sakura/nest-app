@@ -2,7 +2,7 @@ import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../entities/user.entity";
-import { invalidSession } from "../helpers/auth-errors";
+import { authorizationUnavailable, invalidSession } from "../helpers/auth-errors";
 import { TokenPair, TokenService, TokenUse } from "./token.service";
 
 const EVENT: Record<TokenUse, string> = {
@@ -57,7 +57,13 @@ export class SessionService {
         select: { id: true, status: true },
       });
     } catch (error) {
-      this.logger.error(`${EVENT[use]} reason=database: ${(error as Error).message}`);
+      const message = (error as Error).message;
+      // для защищённой операции это сбой авторизации: не 401 и не потеря сессии
+      if (use === "access") {
+        this.logger.error(`Authorization unavailable reason=users: ${message}`);
+        throw authorizationUnavailable();
+      }
+      this.logger.error(`${EVENT[use]} reason=database: ${message}`);
       throw new ServiceUnavailableException("Session check is temporarily unavailable");
     }
 

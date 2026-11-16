@@ -2,6 +2,7 @@ import { ConsoleLogger, Controller, Get, INestApplication, Logger } from "@nestj
 import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
+import { Public } from "../src/authorization/decorators/public.decorator";
 import { createTestApp } from "./helpers/create-test-app";
 
 const email = "abc@gmail.com";
@@ -9,6 +10,7 @@ const password = "Passw0rd-secret";
 const attemptId = "3f2b8c1e-7a4d-4e6b-9c0a-1d2e3f4a5b6c";
 
 // маршрут существует только в тесте: проверяет ответ на непредвиденную ошибку
+@Public()
 @Controller("test-crash")
 class CrashController {
   @Get()

@@ -26,10 +26,11 @@ describe("SessionService", () => {
   let tokenService: { verify: jest.Mock; signPair: jest.Mock };
   let service: SessionService;
   let warn: jest.SpyInstance;
+  let error: jest.SpyInstance;
 
   beforeAll(() => {
     jest.spyOn(Logger.prototype, "log").mockImplementation();
-    jest.spyOn(Logger.prototype, "error").mockImplementation();
+    error = jest.spyOn(Logger.prototype, "error").mockImplementation();
     warn = jest.spyOn(Logger.prototype, "warn").mockImplementation();
   });
 
@@ -100,7 +101,15 @@ describe("SessionService", () => {
   it("returns 503 instead of 401 when the database is unavailable", async () => {
     userRepository.findOne.mockRejectedValue(new Error("connection refused"));
 
-    expect((await errorOf(service.refresh("refresh-jwt"))).status).toBe(503);
+    expect(await errorOf(service.refresh("refresh-jwt"))).toEqual({
+      status: 503,
+      body: {
+        statusCode: 503,
+        message: "Session check is temporarily unavailable",
+        error: "Service Unavailable",
+      },
+    });
+    expect(error).toHaveBeenCalledWith("Refresh failed reason=database: connection refused");
   });
 
   it("returns 503 when signing fails", async () => {
@@ -144,10 +153,20 @@ describe("SessionService", () => {
       },
     );
 
-    it("returns 503 instead of 401 when the database is unavailable", async () => {
+    it("returns authorization_unavailable instead of 401 when the database is unavailable", async () => {
       userRepository.findOne.mockRejectedValue(new Error("connection refused"));
 
-      expect((await errorOf(service.authenticate("access-jwt"))).status).toBe(503);
+      expect(await errorOf(service.authenticate("access-jwt"))).toEqual({
+        status: 503,
+        body: {
+          statusCode: 503,
+          code: "authorization_unavailable",
+          message: "Authorization is temporarily unavailable",
+        },
+      });
+      expect(error).toHaveBeenCalledWith(
+        "Authorization unavailable reason=users: connection refused",
+      );
     });
   });
 });

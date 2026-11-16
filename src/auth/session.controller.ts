@@ -27,8 +27,10 @@ import {
   cookieSameSite,
   setAuthCookies,
 } from "./helpers/auth-cookies";
+import { Public } from "../authorization/decorators/public.decorator";
 
 @ApiTags("Authentication")
+@Public()
 @Controller("auth")
 export class SessionController {
   private readonly logger = new Logger(SessionController.name);

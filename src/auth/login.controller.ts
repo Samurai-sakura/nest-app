@@ -36,8 +36,10 @@ import {
 } from "./dto/auth-responses.dto";
 import { cookieSameSite, setAuthCookies } from "./helpers/auth-cookies";
 import { LOGIN_CONFIRM_PAGE_HTML } from "./helpers/login-confirm-page";
+import { Public } from "../authorization/decorators/public.decorator";
 
 @ApiTags("Authentication")
+@Public()
 @Controller("auth")
 export class LoginController {
   constructor(

@@ -20,6 +20,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag("Register", "Регистрация и подтверждение почты")
     .addTag("Authentication", "Вход, подтверждение входа, refresh и выход")
+    .addTag("Health", "Liveness и readiness")
     .addCookieAuth("access_token")
     .build();
 
