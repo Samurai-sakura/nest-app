@@ -1,8 +1,8 @@
-import { ExecutionContext, ForbiddenException, Logger } from "@nestjs/common";
+import { ForbiddenException, Logger } from "@nestjs/common";
 
 jest.mock("@nestjs/config", () => ({ ConfigService: class {} }));
 
-import { CsrfGuard } from "./csrf.guard";
+import { CsrfPolicy } from "./csrf-policy";
 
 const env: Record<string, string> = {
   APP_URL: "https://api.example.com",
@@ -13,23 +13,17 @@ const config = {
   getOrThrow: (key: string) => env[key],
 };
 
-function contextFor(method: string, headers: Record<string, string> = {}) {
-  const request = { method, path: "/auth/login", headers };
-  return {
-    switchToHttp: () => ({ getRequest: () => request }),
-  } as unknown as ExecutionContext;
-}
-
 function rejection(method: string, headers: Record<string, string>) {
+  const request = { method, path: "/auth/login", headers };
   try {
-    new CsrfGuard(config as any).canActivate(contextFor(method, headers));
+    new CsrfPolicy(config as any).check(request as any);
   } catch (error) {
     return error as ForbiddenException;
   }
   return null;
 }
 
-describe("CsrfGuard", () => {
+describe("CsrfPolicy", () => {
   let warn: jest.SpyInstance;
 
   beforeAll(() => {
