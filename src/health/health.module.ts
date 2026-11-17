@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { AuthorizationModule } from "../authorization/authorization.module";
-import { RbacModule } from "../rbac/rbac.module";
+import { AuthorizationModule } from "../access-control/authorization/authorization.module";
+import { RbacModule } from "../access-control/rbac/rbac.module";
 import { HealthController } from "./health.controller";
 import { HealthService } from "./health.service";
 

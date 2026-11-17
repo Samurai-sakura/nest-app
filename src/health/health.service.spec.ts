@@ -2,8 +2,8 @@ import { Logger } from "@nestjs/common";
 
 jest.mock("@nestjs/config", () => ({ ConfigService: class {} }));
 jest.mock("@nestjs/typeorm", () => ({ InjectDataSource: () => () => undefined }));
-jest.mock("../rbac/services/rbac-policy.service", () => ({ RbacPolicyService: class {} }));
-jest.mock("../authorization/route-configuration.service", () => ({
+jest.mock("../access-control/rbac/services/rbac-policy.service", () => ({ RbacPolicyService: class {} }));
+jest.mock("../access-control/authorization/services/route-configuration.service", () => ({
   RouteConfigurationService: class {},
 }));
 

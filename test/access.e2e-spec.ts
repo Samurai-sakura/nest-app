@@ -9,9 +9,9 @@ import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
 import * as jwt from "jsonwebtoken";
-import { AuthModule } from "../src/auth/auth.module";
-import { CurrentUserId } from "../src/authorization/decorators/current-user-id.decorator";
-import { RequirePermission } from "../src/authorization/decorators/require-permission.decorator";
+import { AuthenticationModule } from "../src/identity/authentication/authentication.module";
+import { CurrentUserId } from "../src/access-control/authorization/decorators/current-user-id.decorator";
+import { RequirePermission } from "../src/access-control/authorization/decorators/require-permission.decorator";
 import { createTestApp } from "./helpers/create-test-app";
 import { grantPermission, resetRbac } from "./helpers/rbac";
 
@@ -48,7 +48,7 @@ describe("Access check (e2e)", () => {
       logged.push(jest.spyOn(Logger.prototype, level).mockImplementation());
     }
     ({ app, db } = await createTestApp({
-      imports: [AuthModule],
+      imports: [AuthenticationModule],
       controllers: [ProtectedController],
     }));
   });

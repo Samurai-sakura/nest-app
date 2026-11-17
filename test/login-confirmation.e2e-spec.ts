@@ -3,7 +3,7 @@ import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
 import * as jwt from "jsonwebtoken";
-import type { UserStatus } from "../src/auth/entities/user.entity";
+import type { UserStatus } from "../src/users/entities/user.entity";
 import { createTestApp } from "./helpers/create-test-app";
 
 const email = "abc@gmail.com";

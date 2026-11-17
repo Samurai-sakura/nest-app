@@ -2,7 +2,7 @@ import { ConsoleLogger, Controller, Get, INestApplication, Logger } from "@nestj
 import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
-import { Public } from "../src/authorization/decorators/public.decorator";
+import { Public } from "../src/access-control/authorization/decorators/public.decorator";
 import { createTestApp } from "./helpers/create-test-app";
 
 const email = "abc@gmail.com";

@@ -4,8 +4,8 @@
     "src/**/*.ts",
     "!src/**/*.spec.ts",
     "!src/main.ts",
-    "!src/data-source.ts",
-    "!src/migrations/**"
+    "!src/database/data-source.ts",
+    "!src/database/migrations/**"
   ],
   "coverageDirectory": "<rootDir>/coverage",
   "coverageReporters": ["text-summary", "text", "html"],

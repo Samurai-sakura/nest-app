@@ -5,8 +5,8 @@ import {
   ApiServiceUnavailableResponse,
   ApiTags,
 } from "@nestjs/swagger";
-import { Public } from "../authorization/decorators/public.decorator";
-import { ErrorResponse } from "../auth/dto/auth-responses.dto";
+import { Public } from "../access-control/authorization/decorators/public.decorator";
+import { ErrorResponse } from "../common/dto/error-response.dto";
 import { HealthService } from "./health.service";
 
 @ApiTags("Health")

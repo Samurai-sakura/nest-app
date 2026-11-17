@@ -1,6 +1,6 @@
 import { INestApplication, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import { RbacPolicyService } from "../src/rbac/services/rbac-policy.service";
+import { RbacPolicyService } from "../src/access-control/rbac/services/rbac-policy.service";
 import { createTestApp } from "./helpers/create-test-app";
 
 describe("RBAC policy (e2e)", () => {

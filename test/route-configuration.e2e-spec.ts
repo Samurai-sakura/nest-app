@@ -1,5 +1,5 @@
 import { INestApplication, Logger } from "@nestjs/common";
-import { RouteConfigurationService } from "../src/authorization/route-configuration.service";
+import { RouteConfigurationService } from "../src/access-control/authorization/services/route-configuration.service";
 import { createTestApp } from "./helpers/create-test-app";
 
 // ловит маршрут приложения, которому забыли поставить @Public() или @RequirePermission()

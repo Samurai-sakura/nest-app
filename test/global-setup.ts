@@ -1,6 +1,6 @@
 import { Client } from "pg";
 import { TEST_DB } from "./setup-env";
-import dataSource from "../src/data-source";
+import dataSource from "../src/database/data-source";
 
 export default async function globalSetup() {
   const admin = new Client({
