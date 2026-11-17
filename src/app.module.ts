@@ -2,16 +2,18 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ThrottlerModule } from "@nestjs/throttler";
-import { AuthModule } from "./auth/auth.module";
-import { RbacModule } from "./rbac/rbac.module";
-import { AuthorizationModule } from "./authorization/authorization.module";
+import { RegistrationModule } from "./identity/registration/registration.module";
+import { AuthenticationModule } from "./identity/authentication/authentication.module";
+import { RbacModule } from "./access-control/rbac/rbac.module";
+import { AuthorizationModule } from "./access-control/authorization/authorization.module";
 import { HealthModule } from "./health/health.module";
 import { APP_FILTER } from "@nestjs/core";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 
 @Module({
   imports: [
-    AuthModule,
+    RegistrationModule,
+    AuthenticationModule,
     RbacModule,
     AuthorizationModule,
     HealthModule,

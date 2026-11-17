@@ -2,7 +2,7 @@ import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import cookieParser from "cookie-parser";
 import type { Request } from "express";
-import { CSRF_HEADER } from "./authorization/csrf-policy";
+import { CSRF_HEADER } from "./access-control/authorization/services/csrf-policy.service";
 import { RequestAwareLogger, requestIdMiddleware } from "./common/request-context";
 
 // общая настройка для main.ts и e2e-тестов

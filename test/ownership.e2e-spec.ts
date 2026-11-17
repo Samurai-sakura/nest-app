@@ -10,10 +10,10 @@ import {
 import request from "supertest";
 import { DataSource } from "typeorm";
 import * as argon2 from "argon2";
-import { AccessControlService } from "../src/authorization/access-control.service";
-import { AuthorizationModule } from "../src/authorization/authorization.module";
-import { CurrentUserId } from "../src/authorization/decorators/current-user-id.decorator";
-import { RequirePermission } from "../src/authorization/decorators/require-permission.decorator";
+import { AccessControlService } from "../src/access-control/authorization/services/access-control.service";
+import { AuthorizationModule } from "../src/access-control/authorization/authorization.module";
+import { CurrentUserId } from "../src/access-control/authorization/decorators/current-user-id.decorator";
+import { RequirePermission } from "../src/access-control/authorization/decorators/require-permission.decorator";
 import { createTestApp } from "./helpers/create-test-app";
 import { grantPermission, resetRbac } from "./helpers/rbac";
 

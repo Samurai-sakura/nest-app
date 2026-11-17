@@ -208,7 +208,7 @@ npm run migration:show     # показать статус миграций
 npm run migration:revert   # откатить последнюю миграцию
 ```
 
-Новую миграцию нужно добавить в массив `migrations` в `src/data-source.ts`, иначе CLI её не увидит.
+Новую миграцию нужно добавить в массив `migrations` в `src/database/data-source.ts`, иначе CLI её не увидит.
 
 ## Тесты
 
@@ -220,4 +220,4 @@ npm run test:cov:all   # оба набора и общее покрытие, н�
 
 E2E-тесты работают с отдельной базой `backend_app_test` и пересоздают её при каждом запуске настоящими миграциями, рабочая база не затрагивается. Почта в них заменена фейком, поэтому Mailpit не нужен. Приложение для e2e собирает `test/helpers/create-test-app.ts` с той же настройкой, что и `main.ts`.
 
-`test:cov:all` завершается с ошибкой, если покрытие ниже 80%. Отчёт в HTML сохраняется в `coverage/index.html`. В покрытие не входят `src/main.ts`, `src/data-source.ts` и миграции.
+`test:cov:all` завершается с ошибкой, если покрытие ниже 80%. Отчёт в HTML сохраняется в `coverage/index.html`. В покрытие не входят `src/main.ts`, `src/database/data-source.ts` и миграции.

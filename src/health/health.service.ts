@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
-import { RbacPolicyService } from "../rbac/services/rbac-policy.service";
-import { RouteConfigurationService } from "../authorization/route-configuration.service";
+import { RbacPolicyService } from "../access-control/rbac/services/rbac-policy.service";
+import { RouteConfigurationService } from "../access-control/authorization/services/route-configuration.service";
 
 const JWT_KEYS = ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"];
 
