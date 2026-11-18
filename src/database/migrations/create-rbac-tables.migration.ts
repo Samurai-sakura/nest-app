@@ -49,7 +49,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
         "name" character varying(64) NOT NULL,
         CONSTRAINT "pk_permission_actions" PRIMARY KEY ("id"),
         CONSTRAINT "uq_permission_actions_permission_name" UNIQUE ("permission_id", "name"),
-        CONSTRAINT "uq_permission_actions_id_permission" UNIQUE ("id", "permission_id"),
         CONSTRAINT "chk_permission_actions_name" CHECK ("name" ${NAME_CHECK}),
         CONSTRAINT "fk_permission_actions_permission" FOREIGN KEY ("permission_id")
           REFERENCES "permissions" ("id") ON DELETE CASCADE ON UPDATE NO ACTION
@@ -67,7 +66,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         CONSTRAINT "pk_grants" PRIMARY KEY ("id"),
         CONSTRAINT "uq_grants_role_permission" UNIQUE ("role_id", "permission_id"),
-        CONSTRAINT "uq_grants_id_permission" UNIQUE ("id", "permission_id"),
         CONSTRAINT "fk_grants_role" FOREIGN KEY ("role_id")
           REFERENCES "roles" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION,
         CONSTRAINT "fk_grants_permission" FOREIGN KEY ("permission_id")
@@ -78,21 +76,21 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       `CREATE INDEX "idx_grants_permission" ON "grants" ("permission_id")`,
     );
 
-    // общий permission_id в обоих FK: действие из чужого разрешения в назначение не попадёт
+    // связка без неключевых полей (BCNF): принадлежность действия разрешению назначения
+    // проверяет сервис RBAC, а проверка доступа соединяет действие только с разрешением назначения
     await queryRunner.query(`
       CREATE TABLE "grant_actions" (
         "grant_id" uuid NOT NULL,
         "permission_action_id" uuid NOT NULL,
-        "permission_id" uuid NOT NULL,
         CONSTRAINT "pk_grant_actions" PRIMARY KEY ("grant_id", "permission_action_id"),
-        CONSTRAINT "fk_grant_actions_grant" FOREIGN KEY ("grant_id", "permission_id")
-          REFERENCES "grants" ("id", "permission_id") ON DELETE CASCADE ON UPDATE NO ACTION,
-        CONSTRAINT "fk_grant_actions_action" FOREIGN KEY ("permission_action_id", "permission_id")
-          REFERENCES "permission_actions" ("id", "permission_id") ON DELETE RESTRICT ON UPDATE NO ACTION
+        CONSTRAINT "fk_grant_actions_grant" FOREIGN KEY ("grant_id")
+          REFERENCES "grants" ("id") ON DELETE CASCADE ON UPDATE NO ACTION,
+        CONSTRAINT "fk_grant_actions_action" FOREIGN KEY ("permission_action_id")
+          REFERENCES "permission_actions" ("id") ON DELETE RESTRICT ON UPDATE NO ACTION
       )
     `);
     await queryRunner.query(
-      `CREATE INDEX "idx_grant_actions_action" ON "grant_actions" ("permission_action_id", "permission_id")`,
+      `CREATE INDEX "idx_grant_actions_action" ON "grant_actions" ("permission_action_id")`,
     );
 
     // роль нельзя удалить, пока она назначена пользователю

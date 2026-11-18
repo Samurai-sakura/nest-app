@@ -9,6 +9,9 @@ if (existsSync(envFile)) {
 }
 
 process.env.POSTGRES_DB = TEST_DB;
+// id администратора из .env существует только в dev-базе; тесты bootstrap задают его сами.
+// Пустая строка, а не delete: без ключа в process.env ConfigService берёт значение из .env
+process.env.RBAC_BOOTSTRAP_ADMIN_USER_ID = "";
 process.env.APP_URL = "http://localhost:3200";
 process.env.FRONTEND_ORIGIN = "http://localhost:3200";
 process.env.CONFIRMATION_HMAC_SECRET = "e2e-registration-confirmation-hmac-key";

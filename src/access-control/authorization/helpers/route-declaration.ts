@@ -1,6 +1,6 @@
 import type { Type } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
-import { RBAC_NAME_PATTERN } from "../../rbac/rbac-name";
+import { RBAC_NAME_PATTERN } from "../../rbac/helpers/rbac-name";
 
 export const PUBLIC_KEY = "authorization:public";
 export const PERMISSION_KEY = "authorization:permission";

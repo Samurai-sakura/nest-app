@@ -7,13 +7,13 @@ import {
 import { Test } from "@nestjs/testing";
 import { ThrottlerException, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_FILTER } from "@nestjs/core";
-import { HttpExceptionFilter } from "../../common/filters/http-exception.filter";
+import { HttpExceptionFilter } from "../../../common/filters/http-exception.filter";
 import request from "supertest";
 
-jest.mock("./services/registration.service", () => ({ RegistrationService: class {} }));
+jest.mock("../services/registration.service", () => ({ RegistrationService: class {} }));
 
 import { RegistrationController } from "./registration.controller";
-import { RegistrationService } from "./services/registration.service";
+import { RegistrationService } from "../services/registration.service";
 
 const attemptId = "3f2b8c1e-7a4d-4e6b-9c0a-1d2e3f4a5b6c";
 

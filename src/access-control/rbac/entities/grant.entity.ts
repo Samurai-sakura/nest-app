@@ -17,7 +17,6 @@ import { GrantAction } from "./grant-action.entity";
 // allActions=true охватывает и действия, добавленные позже; тогда grant_actions пуст
 @Entity("grants")
 @Unique("uq_grants_role_permission", ["roleId", "permissionId"])
-@Unique("uq_grants_id_permission", ["id", "permissionId"])
 @Index("idx_grants_permission", ["permissionId"])
 export class Grant {
   @PrimaryGeneratedColumn("uuid", { primaryKeyConstraintName: "pk_grants" })

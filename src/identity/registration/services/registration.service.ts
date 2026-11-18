@@ -19,6 +19,7 @@ import { User } from "../../../users/entities/user.entity";
 import { RegistrationConfirmation } from "../entities/registration-confirmation.entity";
 import type { ConfirmationMethod } from "../../confirmation-method";
 import { MailService } from "../../../mail/mail.service";
+import { UserRolesService } from "../../../access-control/rbac/services/user-roles.service";
 
 const CONFIRMATION_TTL_SECONDS = 600;
 const RESEND_AFTER_SECONDS = 60;
@@ -29,13 +30,12 @@ export class RegistrationService {
   private readonly logger = new Logger(RegistrationService.name);
 
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
     @InjectRepository(RegistrationConfirmation)
     private readonly confirmationRepository: Repository<RegistrationConfirmation>,
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
     private readonly mailService: MailService,
+    private readonly userRoles: UserRolesService,
   ) {}
 
   public async register(dto: UserRegisterDto) {
@@ -49,16 +49,22 @@ export class RegistrationService {
     return this.registerPending(dto, passwordHash);
   }
 
+  // пользователь сразу active: роль user назначается в той же транзакции
   private async registerActive(dto: UserRegisterDto, passwordHash: string) {
-    const user = this.userRepository.create({
-      email: dto.email,
-      name: dto.name ?? null,
-      passwordHash,
-      status: "active",
-    });
-
+    let user: User;
     try {
-      await this.userRepository.save(user);
+      user = await this.dataSource.transaction(async (manager) => {
+        const created = await manager.save(
+          manager.create(User, {
+            email: dto.email,
+            name: dto.name ?? null,
+            passwordHash,
+            status: "active",
+          }),
+        );
+        await this.userRoles.assignDefaultRole(manager, created.id);
+        return created;
+      });
     } catch (error) {
       this.throwIfEmailTaken(error);
       this.logger.error(`Registration failed: ${(error as Error).message}`);
@@ -296,6 +302,7 @@ export class RegistrationService {
       }
 
       await manager.update(User, attempt.userId, { status: "active" });
+      await this.userRoles.assignDefaultRole(manager, attempt.userId);
       await attempts.update(attempt.id, { consumedAt: new Date() });
       const user = await manager.findOneByOrFail(User, { id: attempt.userId });
       return { status: "ok" as const, attemptId: attempt.id, user };

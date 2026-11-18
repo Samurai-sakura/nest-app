@@ -23,15 +23,15 @@ import {
 } from "@nestjs/swagger";
 import { ThrottlerGuard } from "@nestjs/throttler";
 import type { Response } from "express";
-import { RegistrationService } from "./services/registration.service";
-import { CONFIRM_PAGE_HTML } from "./helpers/confirm-page";
-import { UserRegisterDto } from "./dto/user-register.dto";
-import { ConfirmRegistrationDto } from "./dto/confirm-registration.dto";
-import { ResendConfirmationDto } from "./dto/resend-confirmation.dto";
-import { ConfirmedUserResponse, RegisteredUserResponse } from "./dto/registration-responses.dto";
-import { ConfirmationRequiredResponse } from "../dto/confirmation-required-response.dto";
-import { ErrorResponse } from "../../common/dto/error-response.dto";
-import { Public } from "../../access-control/authorization/decorators/public.decorator";
+import { RegistrationService } from "../services/registration.service";
+import { CONFIRM_PAGE_HTML } from "../helpers/confirm-page";
+import { UserRegisterDto } from "../dto/user-register.dto";
+import { ConfirmRegistrationDto } from "../dto/confirm-registration.dto";
+import { ResendConfirmationDto } from "../dto/resend-confirmation.dto";
+import { ConfirmedUserResponse, RegisteredUserResponse } from "../dto/registration-responses.dto";
+import { ConfirmationRequiredResponse } from "../../dto/confirmation-required-response.dto";
+import { ErrorResponse } from "../../../common/dto/error-response.dto";
+import { Public } from "../../../access-control/authorization/decorators/public.decorator";
 
 @ApiTags("Register")
 @Public()

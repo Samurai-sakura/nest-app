@@ -36,6 +36,8 @@ const METHOD_KEYS = [
   "LOGIN_EMAIL_CONFIRMATION_METHOD",
 ];
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function isPositiveInt(value: string) {
   return /^\d+$/.test(value) && Number(value) > 0;
 }
@@ -91,6 +93,12 @@ export function validateEnv(config: Record<string, unknown>) {
   }
   if (parseHttpUrl(read("FRONTEND_ORIGIN"))?.origin !== read("FRONTEND_ORIGIN")) {
     errors.push("FRONTEND_ORIGIN must be an origin like https://example.com");
+  }
+
+  // нужен только при первой загрузке RBAC, поэтому необязателен
+  const adminUserId = read("RBAC_BOOTSTRAP_ADMIN_USER_ID");
+  if (adminUserId && !UUID_PATTERN.test(adminUserId)) {
+    errors.push("RBAC_BOOTSTRAP_ADMIN_USER_ID must be a user id (uuid)");
   }
 
   for (const key of SECRET_KEYS) {

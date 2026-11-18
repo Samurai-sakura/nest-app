@@ -87,7 +87,8 @@ describe("RBAC policy (e2e)", () => {
     expect(await version()).toBe(before);
   });
 
-  it("rejects an action of another permission in a grant", async () => {
+  // сервис не даёт записать такую связь; если она всё же попала в базу, права она не открывает
+  it("ignores an action of another permission in a grant", async () => {
     const grantId = await grant(false);
     const [{ id: otherPermissionId }] = await db.query(
       `INSERT INTO permissions (name) VALUES ('users') RETURNING id`,
@@ -96,22 +97,20 @@ describe("RBAC policy (e2e)", () => {
       `INSERT INTO permission_actions (permission_id, name) VALUES ($1, 'delete') RETURNING id`,
       [otherPermissionId],
     );
+    await db.query(
+      `INSERT INTO grant_actions (grant_id, permission_action_id) VALUES ($1, $2)`,
+      [grantId, foreignActionId],
+    );
 
-    for (const permission of [permissionId, otherPermissionId]) {
-      await expect(
-        db.query(
-          `INSERT INTO grant_actions (grant_id, permission_action_id, permission_id) VALUES ($1, $2, $3)`,
-          [grantId, foreignActionId, permission],
-        ),
-      ).rejects.toMatchObject({ driverError: { code: "23503" } });
-    }
+    expect(await allowed("users", "delete")).toBe(false);
+    expect(await allowed("reports", "delete")).toBe(false);
   });
 
   it("allows only the listed actions", async () => {
     const grantId = await grant(false);
     await db.query(
-      `INSERT INTO grant_actions (grant_id, permission_action_id, permission_id) VALUES ($1, $2, $3)`,
-      [grantId, actions.read, permissionId],
+      `INSERT INTO grant_actions (grant_id, permission_action_id) VALUES ($1, $2)`,
+      [grantId, actions.read],
     );
 
     expect(await allowed("reports", "read")).toBe(true);

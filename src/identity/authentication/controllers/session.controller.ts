@@ -19,15 +19,15 @@ import {
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
 import type { Request, Response } from "express";
-import { SessionService } from "./services/session.service";
-import { ErrorResponse } from "../../common/dto/error-response.dto";
+import { SessionService } from "../services/session.service";
+import { ErrorResponse } from "../../../common/dto/error-response.dto";
 import {
   REFRESH_COOKIE,
   clearAuthCookies,
   cookieSameSite,
   setAuthCookies,
-} from "./helpers/auth-cookies";
-import { Public } from "../../access-control/authorization/decorators/public.decorator";
+} from "../helpers/auth-cookies";
+import { Public } from "../../../access-control/authorization/decorators/public.decorator";
 
 @ApiTags("Authentication")
 @Public()
