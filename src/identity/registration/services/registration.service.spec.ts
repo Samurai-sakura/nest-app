@@ -16,6 +16,9 @@ jest.mock("@nestjs/typeorm", () => ({
   InjectRepository: () => () => undefined,
 }));
 jest.mock("../../../mail/mail.service", () => ({ MailService: class {} }));
+jest.mock("../../../access-control/rbac/services/user-roles.service", () => ({
+  UserRolesService: class {},
+}));
 
 import { RegistrationService } from "./registration.service";
 import { User } from "../../../users/entities/user.entity";
@@ -59,12 +62,12 @@ function makeAttempt(
 
 describe("RegistrationService", () => {
   let env: Record<string, string>;
-  let userRepository: { create: jest.Mock; save: jest.Mock };
   let confirmationRepository: { update: jest.Mock };
   let attempts: { findOne: jest.Mock; increment: jest.Mock; update: jest.Mock };
   let manager: Record<string, jest.Mock>;
   let dataSource: { transaction: jest.Mock };
   let mail: { sendOtp: jest.Mock; sendMagicLink: jest.Mock };
+  let userRoles: { assignDefaultRole: jest.Mock };
   let service: RegistrationService;
 
   beforeAll(() => {
@@ -88,10 +91,6 @@ describe("RegistrationService", () => {
       },
     };
 
-    userRepository = {
-      create: jest.fn((data) => ({ ...data })),
-      save: jest.fn(async (user) => Object.assign(user, { id: "user-1" })),
-    };
     confirmationRepository = { update: jest.fn() };
     attempts = { findOne: jest.fn(), increment: jest.fn(), update: jest.fn() };
     manager = {
@@ -112,13 +111,14 @@ describe("RegistrationService", () => {
     };
     dataSource = { transaction: jest.fn((cb) => cb(manager)) };
     mail = { sendOtp: jest.fn(), sendMagicLink: jest.fn() };
+    userRoles = { assignDefaultRole: jest.fn() };
 
     service = new RegistrationService(
-      userRepository as any,
       confirmationRepository as any,
       dataSource as any,
       config as any,
       mail as any,
+      userRoles as any,
     );
   });
 
@@ -128,7 +128,7 @@ describe("RegistrationService", () => {
     it("creates an active user with a slow password hash", async () => {
       const result = await service.register(dto);
 
-      const saved = userRepository.save.mock.calls[0][0];
+      const saved = manager.save.mock.calls[0][0];
       expect(saved.status).toBe("active");
       expect(saved.passwordHash).not.toBe(dto.password);
       expect(await argon2.verify(saved.passwordHash, dto.password)).toBe(true);
@@ -141,12 +141,26 @@ describe("RegistrationService", () => {
       expect(result).not.toHaveProperty("password");
     });
 
+    it("assigns the user role in the same transaction", async () => {
+      await service.register(dto);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(userRoles.assignDefaultRole).toHaveBeenCalledWith(manager, "user-1");
+    });
+
     it("throws 409 when email is already taken", async () => {
-      userRepository.save.mockRejectedValue(uniqueViolation());
+      manager.save.mockRejectedValue(uniqueViolation());
 
       await expect(service.register(dto)).rejects.toBeInstanceOf(
         ConflictException,
       );
+      expect(userRoles.assignDefaultRole).not.toHaveBeenCalled();
+    });
+
+    it("does not register the user when the role cannot be assigned", async () => {
+      userRoles.assignDefaultRole.mockRejectedValue(new Error("connection lost"));
+
+      await expect(service.register(dto)).rejects.toThrow("connection lost");
     });
   });
 
@@ -162,6 +176,7 @@ describe("RegistrationService", () => {
 
       const [userData, attemptData] = manager.save.mock.calls.map((c) => c[0]);
       expect(userData.status).toBe("pending");
+      expect(userRoles.assignDefaultRole).not.toHaveBeenCalled();
       expect(attemptData.method).toBe("otp");
 
       const code = mail.sendOtp.mock.calls[0][1];
@@ -231,6 +246,7 @@ describe("RegistrationService", () => {
       expect(manager.update).toHaveBeenCalledWith(User, "user-1", {
         status: "active",
       });
+      expect(userRoles.assignDefaultRole).toHaveBeenCalledWith(manager, "user-1");
       expect(attempts.update).toHaveBeenCalledWith("attempt-1", {
         consumedAt: expect.any(Date),
       });
@@ -253,6 +269,7 @@ describe("RegistrationService", () => {
         1,
       );
       expect(manager.update).not.toHaveBeenCalled();
+      expect(userRoles.assignDefaultRole).not.toHaveBeenCalled();
     });
 
     it("accepts the correct code on the fifth try", async () => {

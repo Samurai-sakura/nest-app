@@ -1,10 +1,10 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
+import { Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
 import { Grant } from "./grant.entity";
 import { PermissionAction } from "./permission-action.entity";
 
-// permission_id входит в оба составных FK: действие должно принадлежать разрешению назначения
+// действие должно принадлежать разрешению назначения: это проверяет сервис RBAC
 @Entity("grant_actions")
-@Index("idx_grant_actions_action", ["permissionActionId", "permissionId"])
+@Index("idx_grant_actions_action", ["permissionActionId"])
 export class GrantAction {
   @PrimaryColumn({
     name: "grant_id",
@@ -20,28 +20,14 @@ export class GrantAction {
   })
   permissionActionId: string;
 
-  @Column({ name: "permission_id", type: "uuid" })
-  permissionId: string;
-
   @ManyToOne(() => Grant, (grant) => grant.actions, { onDelete: "CASCADE" })
-  @JoinColumn([
-    {
-      name: "grant_id",
-      referencedColumnName: "id",
-      foreignKeyConstraintName: "fk_grant_actions_grant",
-    },
-    { name: "permission_id", referencedColumnName: "permissionId" },
-  ])
+  @JoinColumn({ name: "grant_id", foreignKeyConstraintName: "fk_grant_actions_grant" })
   grant: Grant;
 
   @ManyToOne(() => PermissionAction, { onDelete: "RESTRICT" })
-  @JoinColumn([
-    {
-      name: "permission_action_id",
-      referencedColumnName: "id",
-      foreignKeyConstraintName: "fk_grant_actions_action",
-    },
-    { name: "permission_id", referencedColumnName: "permissionId" },
-  ])
+  @JoinColumn({
+    name: "permission_action_id",
+    foreignKeyConstraintName: "fk_grant_actions_action",
+  })
   permissionAction: PermissionAction;
 }

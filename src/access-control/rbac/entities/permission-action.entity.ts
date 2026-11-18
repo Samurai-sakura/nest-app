@@ -11,7 +11,6 @@ import { Permission } from "./permission.entity";
 
 @Entity("permission_actions")
 @Unique("uq_permission_actions_permission_name", ["permissionId", "name"])
-@Unique("uq_permission_actions_id_permission", ["id", "permissionId"])
 @Check("chk_permission_actions_name", `"name" ~ '^[a-z][a-z0-9._-]{0,63}$'`)
 export class PermissionAction {
   @PrimaryGeneratedColumn("uuid", { primaryKeyConstraintName: "pk_permission_actions" })

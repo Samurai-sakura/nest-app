@@ -21,6 +21,10 @@ async function bootstrap() {
     .addTag("Register", "Регистрация и подтверждение почты")
     .addTag("Authentication", "Вход, подтверждение входа, refresh и выход")
     .addTag("Health", "Liveness и readiness")
+    .addTag("RBAC Roles", "Роли. Требуется rbac@manage")
+    .addTag("RBAC Permissions", "Разрешения и их действия. Требуется rbac@manage")
+    .addTag("RBAC Grants", "Назначения разрешений ролям. Требуется rbac@manage")
+    .addTag("RBAC User Roles", "Роли конкретного пользователя. Требуется rbac@manage")
     .addCookieAuth("access_token")
     .build();
 

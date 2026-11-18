@@ -168,4 +168,14 @@ describe("validateEnv", () => {
       "AUTH_COOKIE_SAME_SITE must be strict or none",
     );
   });
+
+  it("accepts an optional RBAC_BOOTSTRAP_ADMIN_USER_ID that is a uuid", () => {
+    expect(errorFor({ RBAC_BOOTSTRAP_ADMIN_USER_ID: undefined })).toBeNull();
+    expect(
+      errorFor({ RBAC_BOOTSTRAP_ADMIN_USER_ID: "3f2b8c1e-7a4d-4e6b-9c0a-1d2e3f4a5b6c" }),
+    ).toBeNull();
+    expect(errorFor({ RBAC_BOOTSTRAP_ADMIN_USER_ID: "admin" })).toContain(
+      "RBAC_BOOTSTRAP_ADMIN_USER_ID must be a user id (uuid)",
+    );
+  });
 });

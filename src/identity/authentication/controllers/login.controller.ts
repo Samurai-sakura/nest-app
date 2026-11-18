@@ -24,17 +24,17 @@ import {
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
 import type { Response } from "express";
-import { LoginService } from "./services/login.service";
-import { LoginChallengeService } from "./services/login-challenge.service";
-import { UserLoginDto } from "./dto/user-login.dto";
-import { ConfirmLoginDto } from "./dto/confirm-login.dto";
-import { ResendLoginDto } from "./dto/resend-login.dto";
-import { LoginResendResponse } from "./dto/login-responses.dto";
-import { ConfirmationRequiredResponse } from "../dto/confirmation-required-response.dto";
-import { ErrorResponse } from "../../common/dto/error-response.dto";
-import { cookieSameSite, setAuthCookies } from "./helpers/auth-cookies";
-import { LOGIN_CONFIRM_PAGE_HTML } from "./helpers/login-confirm-page";
-import { Public } from "../../access-control/authorization/decorators/public.decorator";
+import { LoginService } from "../services/login.service";
+import { LoginChallengeService } from "../services/login-challenge.service";
+import { UserLoginDto } from "../dto/user-login.dto";
+import { ConfirmLoginDto } from "../dto/confirm-login.dto";
+import { ResendLoginDto } from "../dto/resend-login.dto";
+import { LoginResendResponse } from "../dto/login-responses.dto";
+import { ConfirmationRequiredResponse } from "../../dto/confirmation-required-response.dto";
+import { ErrorResponse } from "../../../common/dto/error-response.dto";
+import { cookieSameSite, setAuthCookies } from "../helpers/auth-cookies";
+import { LOGIN_CONFIRM_PAGE_HTML } from "../helpers/login-confirm-page";
+import { Public } from "../../../access-control/authorization/decorators/public.decorator";
 
 @ApiTags("Authentication")
 @Public()

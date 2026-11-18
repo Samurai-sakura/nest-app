@@ -7,9 +7,9 @@ import { TokenService } from "./services/token.service";
 import { LoginService } from "./services/login.service";
 import { LoginAttemptLimiter } from "./services/login-attempt-limiter.service";
 import { LoginChallengeService } from "./services/login-challenge.service";
-import { LoginController } from "./login.controller";
+import { LoginController } from "./controllers/login.controller";
 import { SessionService } from "./services/session.service";
-import { SessionController } from "./session.controller";
+import { SessionController } from "./controllers/session.controller";
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, LoginChallenge]), MailModule],

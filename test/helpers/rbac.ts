@@ -29,8 +29,8 @@ export async function grantPermission(
     [roleId, permissionId],
   );
   await db.query(
-    `INSERT INTO grant_actions (grant_id, permission_action_id, permission_id)
-     SELECT $1, id, permission_id FROM permission_actions WHERE permission_id = $2`,
+    `INSERT INTO grant_actions (grant_id, permission_action_id)
+     SELECT $1, id FROM permission_actions WHERE permission_id = $2`,
     [grantId, permissionId],
   );
   await db.query(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, [userId, roleId]);
