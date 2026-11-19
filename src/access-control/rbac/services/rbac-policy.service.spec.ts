@@ -153,7 +153,6 @@ describe("RbacPolicyService", () => {
     );
     expect(service.ready).toBe(false);
 
-    // даже прежняя версия не возвращает старые права без новой загрузки
     policyRepository.findOne.mockResolvedValue({ version: 1 });
     expect(await errorOf(service.authorize("user-1", "reports", "read"))).toEqual(
       unavailable,
@@ -187,7 +186,6 @@ describe("RbacPolicyService", () => {
     const first = service.authorize("user-1", "reports", "read");
     await new Promise(setImmediate);
 
-    // версия выросла, пока первая загрузка ещё читает права
     policyRepository.findOne.mockResolvedValue({ version: 2 });
     const second = service.authorize("user-1", "reports", "read");
     await new Promise(setImmediate);
@@ -215,7 +213,6 @@ describe("RbacPolicyService", () => {
       await expect(service.checkReady()).resolves.toBe(true);
       expect(service.ready).toBe(true);
 
-      // готовый снимок не перезагружается на каждую проверку
       await service.checkReady();
       expect(loads()).toBe(2);
     });

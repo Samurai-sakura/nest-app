@@ -31,7 +31,6 @@ export function rbacBadRequest(code: string, message: string) {
   return new BadRequestException({ statusCode: HttpStatus.BAD_REQUEST, code, message });
 }
 
-// база недоступна: изменение не записано, его можно повторить позже
 export function rbacUnavailable() {
   return new ServiceUnavailableException({
     statusCode: HttpStatus.SERVICE_UNAVAILABLE,
@@ -40,7 +39,6 @@ export function rbacUnavailable() {
   });
 }
 
-// изменение оставило бы систему без пользователя, способного управлять RBAC
 export function lastManagerConflict() {
   return rbacConflict(
     "last_rbac_manager",

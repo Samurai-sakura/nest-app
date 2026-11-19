@@ -29,7 +29,6 @@ class ReportsController {
   @RequirePermission("reports", "export")
   export() {}
 
-  // не маршрут: декларация не нужна
   helper() {}
 }
 

@@ -60,6 +60,7 @@ npm run start:dev
 | `LOGIN_EMAIL_CONFIRMATION_METHOD` | Способ подтверждения входа: `otp` или `magic_link` |
 | `JWT_ISSUER`, `JWT_AUDIENCE` | Издатель и получатель JWT, проверяются при каждом запросе |
 | `RBAC_BOOTSTRAP_ADMIN_USER_ID` | Необязательно. Id существующего пользователя, которому первая загрузка RBAC назначит роль `admin`. Действует только при пустых таблицах RBAC; если пользователя нет, приложение не запустится |
+| `PHOTO_STORAGE_DIR` | Необязательно, по умолчанию `storage/photos`. Папка с фотографиями профиля; подходит только для разработки и одного экземпляра приложения |
 | `CONFIRMATION_HMAC_SECRET` | Ключ HMAC для кодов и токенов из писем регистрации |
 | `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET` | Ключи подписи access- и refresh-токенов |
 | `LOGIN_CHALLENGE_HMAC_KEY` | Ключ HMAC для кодов и токенов из писем входа |

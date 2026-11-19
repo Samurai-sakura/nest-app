@@ -5,10 +5,6 @@ import type { Request } from "express";
 export const CSRF_HEADER = "x-csrf-protection";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-// изменяющий запрос из другого origin принимается только от FRONTEND_ORIGIN
-// и только с X-CSRF-Protection: 1, даже если оба origin на одном site.
-// Запрос без Origin браузер не отправляет кросс-доменно: это curl, тесты или тот же origin.
-// Для защищённой операции вызывается после установки личности, чтобы отсутствие сессии давало 401
 @Injectable()
 export class CsrfPolicy {
   private readonly logger = new Logger(CsrfPolicy.name);

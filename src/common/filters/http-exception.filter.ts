@@ -26,9 +26,6 @@ type ErrorBody = Record<string, unknown> & {
   message: unknown;
 };
 
-// единый формат ошибки: statusCode, code, message и необязательные поля конкретной операции.
-// Отказы ValidationPipe и ThrottlerGuard срабатывают до сервисов, поэтому журналируются здесь.
-// path берётся без query: в нём может быть токен
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -58,7 +55,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
       body.code = "rate_limited";
       this.logger.warn(`Request rejected reason=rate_limit route=${route}`);
     } else if (body.statusCode === 400 && Array.isArray(body.message)) {
-      // массив приходит только от ValidationPipe; значений полей в сообщениях нет
       body.code = "validation_failed";
       this.logger.warn(
         `Request rejected reason=validation route=${route} details=${body.message.join("; ")}`,

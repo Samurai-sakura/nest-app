@@ -8,6 +8,7 @@ import {
 } from "./migrations/create-auth-tables.migration";
 import { CreateLoginChallengesMigration } from "./migrations/create-login-challenges.migration";
 import { CreateRbacTablesMigration } from "./migrations/create-rbac-tables.migration";
+import { AddUserProfileColumnsMigration } from "./migrations/add-user-profile-columns.migration";
 import { Role } from "../access-control/rbac/entities/role.entity";
 import { Permission } from "../access-control/rbac/entities/permission.entity";
 import { PermissionAction } from "../access-control/rbac/entities/permission-action.entity";
@@ -43,5 +44,6 @@ export default new DataSource({
     CreateAuthTablesMigration,
     CreateLoginChallengesMigration,
     CreateRbacTablesMigration,
+    AddUserProfileColumnsMigration,
   ],
 });

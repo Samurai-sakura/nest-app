@@ -19,13 +19,9 @@ import {
 
 interface CreatedPermission {
   id: string;
-  // имя действия → id
   actions: Record<string, string>;
 }
 
-// начальная загрузка выполняется один раз и только для пустой конфигурации RBAC.
-// Запускается раньше загрузки снимка (onApplicationBootstrap), публичной операции у неё нет.
-// Ошибка не даёт приложению стартовать: без политики защищённые операции бессмысленны
 @Injectable()
 export class RbacBootstrapService implements OnModuleInit {
   private readonly logger = new Logger(RbacBootstrapService.name);
@@ -39,12 +35,10 @@ export class RbacBootstrapService implements OnModuleInit {
     await this.bootstrap();
   }
 
-  // возвращает false, если конфигурация уже есть и загрузка пропущена
   public async bootstrap(): Promise<boolean> {
     const adminUserId = this.config.get<string>("RBAC_BOOTSTRAP_ADMIN_USER_ID") || undefined;
 
     return this.dataSource.transaction(async (manager) => {
-      // второй процесс ждёт фиксации первого и затем видит непустую конфигурацию
       await manager.query(`SELECT 1 FROM "rbac_policy_state" WHERE "id" = $1 FOR UPDATE`, [
         POLICY_STATE_ID,
       ]);
@@ -71,7 +65,6 @@ export class RbacBootstrapService implements OnModuleInit {
           "RBAC bootstrap without RBAC_BOOTSTRAP_ADMIN_USER_ID: nobody can manage RBAC",
         );
       }
-      // pending получит роль при активации
       const assigned: unknown[] = await manager.query(
         `INSERT INTO "user_roles" ("user_id", "role_id")
          SELECT u."id", $1 FROM "users" u
@@ -105,7 +98,6 @@ export class RbacBootstrapService implements OnModuleInit {
     return permissions;
   }
 
-  // роль → id роли
   private async createRoles(
     manager: EntityManager,
     permissions: Record<string, CreatedPermission>,

@@ -11,7 +11,6 @@ const HEADER_PATTERN = /^[a-z0-9-]+$/;
 export interface RequiredPermission {
   permission: string;
   action: string;
-  // критическая операция: успешный допуск тоже попадает в журнал
   audit?: boolean;
 }
 
@@ -24,8 +23,6 @@ export type DeclarationCheck =
   | { valid: true; declaration: RouteDeclaration }
   | { valid: false; reason: string };
 
-// декларация метода перекрывает декларацию контроллера по каждому ключу отдельно,
-// поэтому @Public() на контроллере и пара на методе дают конфликт, а не публичный маршрут
 export function readDeclaration(
   reflector: Reflector,
   handler: Function,

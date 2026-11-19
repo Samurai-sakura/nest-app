@@ -14,8 +14,6 @@ export interface RouteConfigurationError {
   reason: string;
 }
 
-// маршрут без корректной декларации и так закрыт guard'ом;
-// проверка при старте находит его до первого запроса и снимает readiness
 @Injectable()
 export class RouteConfigurationService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RouteConfigurationService.name);
@@ -55,7 +53,6 @@ export class RouteConfigurationService implements OnApplicationBootstrap {
       for (const name of this.scanner.getAllMethodNames(prototype)) {
         const handler = prototype[name];
         const method: RequestMethod | undefined = Reflect.getMetadata(METHOD_METADATA, handler);
-        // вспомогательный метод контроллера, а не маршрут
         if (method === undefined) {
           continue;
         }

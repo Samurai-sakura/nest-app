@@ -21,7 +21,6 @@ export class UserRolesService {
     private readonly admin: RbacAdminService,
   ) {}
 
-  // ответ без email и полей профиля: только идентификаторы
   public async get(actorUserId: string, userId: string): Promise<UserRolesResponse> {
     if (!(await this.userRepository.exists({ where: { id: userId } }))) {
       const error = rbacNotFound("user");
@@ -35,7 +34,6 @@ export class UserRolesService {
     return { userId, roleIds: links.map((link) => link.roleId).sort() };
   }
 
-  // список заменяется целиком; пустой массив снимает все роли
   public replace(actorUserId: string, userId: string, roleIds: string[]) {
     return this.admin.change(
       { operation: "user_roles.replace", entity: "user_roles", entityId: userId, actorUserId },
@@ -61,8 +59,6 @@ export class UserRolesService {
     );
   }
 
-  // вызывается в транзакции, которая переводит пользователя в active: связь и статус
-  // фиксируются вместе. Уже назначенная роль не дублируется, состав прав выбирает RBAC
   public async assignDefaultRole(manager: EntityManager, userId: string) {
     const assigned: unknown[] = await manager.query(
       `INSERT INTO "user_roles" ("user_id", "role_id")
@@ -74,7 +70,6 @@ export class UserRolesService {
     if (assigned.length > 0) {
       return;
     }
-    // активация не откатывается: пользователь просто остаётся без прав до назначения через API
     const roleExists = await manager.query(`SELECT 1 FROM "roles" WHERE "name" = $1`, [
       USER_ROLE,
     ]);

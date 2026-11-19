@@ -1,8 +1,7 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
   IsEmail,
-  IsOptional,
   IsString,
   Matches,
   MaxLength,
@@ -17,12 +16,6 @@ export class UserRegisterDto {
   @IsEmail()
   @MaxLength(255)
   email: string;
-
-  @ApiPropertyOptional({ example: "Alex" })
-  @IsOptional()
-  @IsString()
-  @MaxLength(250)
-  name?: string;
 
   @ApiProperty({ example: "Passw0rd" })
   @IsString()

@@ -12,6 +12,7 @@ function validEnv(): Record<string, string> {
     PORT: "3200",
     APP_URL: "http://localhost:3200",
     FRONTEND_ORIGIN: "http://localhost:3200",
+    PUBLIC_API_BASE_URL: "http://localhost:3200",
     REGISTRATION_CONFIRM_ENABLED: "true",
     REGISTRATION_CONFIRM_METHOD: "otp",
     REGISTRATION_RATE_LIMIT: "5",
@@ -143,6 +144,31 @@ describe("validateEnv", () => {
       expect(errorFor({ APP_URL: value })).toContain("APP_URL");
     },
   );
+
+  it.each([
+    "https://api.example.com",
+    "https://example.com/api/v1/",
+    "http://localhost:3200",
+    "http://127.0.0.1:3200",
+    "http://[::1]:3200",
+  ])("accepts PUBLIC_API_BASE_URL %p", (value) => {
+    expect(errorFor({ PUBLIC_API_BASE_URL: value })).toBeNull();
+  });
+
+  it.each([undefined, "", "not a url", "ftp://api.example.com", "https://api.example.com/?a=1", "https://api.example.com/#top"])(
+    "rejects PUBLIC_API_BASE_URL %p",
+    (value) => {
+      expect(errorFor({ PUBLIC_API_BASE_URL: value })).toContain(
+        "PUBLIC_API_BASE_URL must be an http(s) URL without query or fragment",
+      );
+    },
+  );
+
+  it("requires https for PUBLIC_API_BASE_URL outside localhost", () => {
+    expect(errorFor({ PUBLIC_API_BASE_URL: "http://api.example.com" })).toContain(
+      "PUBLIC_API_BASE_URL must use https outside localhost",
+    );
+  });
 
   it.each([
     "http://localhost:3200/",

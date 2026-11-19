@@ -5,7 +5,6 @@ export const resetRbac = (db: DataSource) =>
     `TRUNCATE "grant_actions", "grants", "user_roles", "permission_actions", "permissions", "roles" CASCADE`,
   );
 
-// создаёт роль с перечисленными действиями одного разрешения и назначает её пользователю
 export async function grantPermission(
   db: DataSource,
   userId: string,
