@@ -6,8 +6,6 @@ import { validateEnv } from "./config/env.validation";
 import { setupApp } from "./app.setup";
 
 async function bootstrap() {
-  // не через validate в ConfigModule: тогда ConfigService читает снимок
-  // со старта и не видит process.env, который меняют e2e-тесты
   if (existsSync(".env")) {
     process.loadEnvFile(".env");
   }
@@ -25,6 +23,7 @@ async function bootstrap() {
     .addTag("RBAC Permissions", "Разрешения и их действия. Требуется rbac@manage")
     .addTag("RBAC Grants", "Назначения разрешений ролям. Требуется rbac@manage")
     .addTag("RBAC User Roles", "Роли конкретного пользователя. Требуется rbac@manage")
+    .addTag("Users", "Пользователи")
     .addCookieAuth("access_token")
     .build();
 

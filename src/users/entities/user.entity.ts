@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from "typeorm";
 
@@ -14,6 +15,7 @@ export type UserStatus =
   | "deleted";
 
 @Entity("users")
+@Unique("uq_users_photo_key", ["photoKey"])
 export class User {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -21,8 +23,11 @@ export class User {
   @Column({ type: "varchar", length: 255, unique: true })
   email: string;
 
-  @Column({ type: "varchar", length: 250, nullable: true })
-  name: string | null;
+  @Column({ name: "display_name", type: "varchar", length: 80, nullable: true })
+  displayName: string | null;
+
+  @Column({ name: "photo_key", type: "varchar", length: 255, nullable: true })
+  photoKey: string | null;
 
   @Column({ type: "varchar", length: 20 })
   status: UserStatus;

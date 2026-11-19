@@ -19,10 +19,8 @@ import { grantPermission, resetRbac } from "./helpers/rbac";
 
 const password = "Passw0rd-secret";
 const handler = jest.fn();
-// заметки хранятся в памяти: проверяется порядок проверок, а не бизнес-логика
 const notes = new Map<string, { id: string; ownerId: string }>();
 
-// *_any проверяется до поиска цели: идентификатор цели известен из пути
 @Controller("test-profiles")
 class ProfilesController {
   constructor(
@@ -45,7 +43,6 @@ class ProfilesController {
   }
 }
 
-// владелец известен только после загрузки записи
 @Controller("test-notes")
 class NotesController {
   constructor(private readonly access: AccessControlService) {}

@@ -10,7 +10,6 @@ import { resetRbac } from "./helpers/rbac";
 const email = "abc@gmail.com";
 const password = "Passw0rd-secret";
 
-// роль user назначается в той же транзакции, которая переводит пользователя в active
 describe("Default role on activation (e2e)", () => {
   const logged: jest.SpyInstance[] = [];
   const mail = { sendOtp: jest.fn(), sendMagicLink: jest.fn() };

@@ -36,6 +36,8 @@ const METHOD_KEYS = [
   "LOGIN_EMAIL_CONFIRMATION_METHOD",
 ];
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isPositiveInt(value: string) {
@@ -95,7 +97,16 @@ export function validateEnv(config: Record<string, unknown>) {
     errors.push("FRONTEND_ORIGIN must be an origin like https://example.com");
   }
 
-  // нужен только при первой загрузке RBAC, поэтому необязателен
+  const publicApiBaseUrl = parseHttpUrl(read("PUBLIC_API_BASE_URL"));
+  if (!publicApiBaseUrl || publicApiBaseUrl.search || publicApiBaseUrl.hash) {
+    errors.push("PUBLIC_API_BASE_URL must be an http(s) URL without query or fragment");
+  } else if (
+    publicApiBaseUrl.protocol !== "https:" &&
+    !LOCAL_HOSTS.has(publicApiBaseUrl.hostname)
+  ) {
+    errors.push("PUBLIC_API_BASE_URL must use https outside localhost");
+  }
+
   const adminUserId = read("RBAC_BOOTSTRAP_ADMIN_USER_ID");
   if (adminUserId && !UUID_PATTERN.test(adminUserId)) {
     errors.push("RBAC_BOOTSTRAP_ADMIN_USER_ID must be a user id (uuid)");

@@ -49,7 +49,6 @@ export class RegistrationService {
     return this.registerPending(dto, passwordHash);
   }
 
-  // пользователь сразу active: роль user назначается в той же транзакции
   private async registerActive(dto: UserRegisterDto, passwordHash: string) {
     let user: User;
     try {
@@ -57,7 +56,6 @@ export class RegistrationService {
         const created = await manager.save(
           manager.create(User, {
             email: dto.email,
-            name: dto.name ?? null,
             passwordHash,
             status: "active",
           }),
@@ -72,7 +70,7 @@ export class RegistrationService {
     }
 
     this.logger.log(`Registration succeeded userId=${user.id} status=active`);
-    return { id: user.id, name: user.name ?? null, email: user.email, status: user.status };
+    return { id: user.id, email: user.email, status: user.status };
   }
 
   private async registerPending(dto: UserRegisterDto, passwordHash: string) {
@@ -88,7 +86,6 @@ export class RegistrationService {
         const user = await manager.save(
           manager.create(User, {
             email: dto.email,
-            name: dto.name ?? null,
             passwordHash,
             status: "pending",
           }),

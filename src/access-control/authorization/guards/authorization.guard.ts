@@ -14,8 +14,6 @@ export interface AuthenticatedRequest extends Request {
   userId?: string;
 }
 
-// единая цепочка для каждого маршрута: декларация → access → пользователь → CSRF → RBAC.
-// Маршрут без корректной декларации закрыт, открыть его можно только явным @Public()
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
   private readonly logger = new Logger(AuthorizationGuard.name);
@@ -40,7 +38,6 @@ export class AuthorizationGuard implements CanActivate {
     }
     const { declaration } = check;
 
-    // публичная операция и квитанция не разбирают access-cookie, но изменение из другого origin проверяют
     if (declaration.kind === "public") {
       this.csrfPolicy.check(request);
       return true;
@@ -54,7 +51,6 @@ export class AuthorizationGuard implements CanActivate {
       throw invalidSession();
     }
 
-    // access берётся только из cookie: заголовок Authorization, тело и query не читаются
     const cookies = request.cookies as Record<string, string> | undefined;
     const userId = await this.sessionService.authenticate(cookies?.[ACCESS_COOKIE]);
 
@@ -62,7 +58,6 @@ export class AuthorizationGuard implements CanActivate {
 
     const { permission, action, audit } = declaration.required;
     const decision = await this.rbac.authorize(userId, permission, action);
-    // requestId дописывает логгер; роли и содержимое снимка в журнал не попадают
     const details = `actorUserId=${userId} operation=${context.getClass().name}.${context.getHandler().name} route=${route} required=${permission}@${action} policyVersion=${decision.version}`;
     if (!decision.allowed) {
       this.logger.warn(`Request rejected reason=permission_denied ${details}`);

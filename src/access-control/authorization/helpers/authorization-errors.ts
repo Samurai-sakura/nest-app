@@ -1,6 +1,5 @@
 import { ForbiddenException, HttpStatus } from "@nestjs/common";
 
-// личность установлена, но права нет; одинаково для существующего и вымышленного ресурса
 export function permissionDenied() {
   return new ForbiddenException({
     statusCode: HttpStatus.FORBIDDEN,
@@ -9,7 +8,6 @@ export function permissionDenied() {
   });
 }
 
-// право на операцию есть, но запись принадлежит другому пользователю
 export function ownershipDenied() {
   return new ForbiddenException({
     statusCode: HttpStatus.FORBIDDEN,

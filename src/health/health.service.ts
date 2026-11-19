@@ -20,7 +20,6 @@ export class HealthService {
     private readonly config: ConfigService,
   ) {}
 
-  // имена проваленных проверок только в журнале: наружу readiness отвечает без подробностей
   public async failedChecks(): Promise<ReadinessCheck[]> {
     const checks: Record<ReadinessCheck, boolean> = {
       database: await this.databaseReachable(),

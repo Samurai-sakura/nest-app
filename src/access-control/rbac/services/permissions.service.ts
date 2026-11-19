@@ -37,7 +37,6 @@ export class PermissionsService {
     );
   }
 
-  // действия сопоставляются по имени: оставшиеся сохраняют id, поэтому назначения на них не теряются
   public replace(actorUserId: string, permissionId: string, dto: PermissionBodyDto) {
     return this.admin.change(
       { operation: "permission.replace", entity: "permission", entityId: permissionId, actorUserId },
@@ -54,8 +53,6 @@ export class PermissionsService {
         const kept = new Set(permission.actions.map((action) => action.name));
         const added = dto.actions.filter((name) => !kept.has(name));
 
-        // назначение всех действий просто перестаёт охватывать удалённое действие,
-        // а конкретное назначение на него запрещает удаление
         if (
           removed.length > 0 &&
           (await manager.exists(GrantAction, {
@@ -81,7 +78,6 @@ export class PermissionsService {
     );
   }
 
-  // разрешение с назначениями не удаляется: RESTRICT в базе даёт 409; действия удаляются каскадно
   public async remove(actorUserId: string, permissionId: string) {
     await this.admin.change(
       { operation: "permission.delete", entity: "permission", entityId: permissionId, actorUserId },

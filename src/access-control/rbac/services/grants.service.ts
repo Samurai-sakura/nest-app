@@ -63,7 +63,6 @@ export class GrantsService {
     );
   }
 
-  // действия назначения удаляются каскадно
   public async remove(actorUserId: string, grantId: string) {
     await this.admin.change(
       { operation: "grant.delete", entity: "grant", entityId: grantId, actorUserId },
@@ -76,8 +75,6 @@ export class GrantsService {
     );
   }
 
-  // проверяет роль и разрешение; возвращает id действий, пустой список означает все действия.
-  // Действие другого разрешения сюда не попадёт: схема этого не запрещает, поэтому проверка здесь
   private async resolve(manager: EntityManager, dto: GrantBodyDto) {
     if (!(await manager.exists(Role, { where: { id: dto.roleId } }))) {
       throw rbacNotFound("role");
@@ -120,7 +117,6 @@ export class GrantsService {
   }
 }
 
-// назначение всех действий явно отдаёт allActions: true и пустой actions
 function toGrantView(grant: Grant): GrantResponse {
   return {
     id: grant.id,

@@ -13,7 +13,6 @@ const MISSING_ID = "00000000-0000-4000-8000-000000000000";
 
 describe("RBAC admin API (e2e)", () => {
   const logged: jest.SpyInstance[] = [];
-  // шпионы на сервисы снимаются после каждого теста, иначе следующий видит чужие вызовы
   const serviceSpies: jest.SpyInstance[] = [];
   let app: INestApplication;
   let db: DataSource;
@@ -56,7 +55,6 @@ describe("RBAC admin API (e2e)", () => {
 
   const http = () => request(app.getHttpServer());
 
-  // вход проверяют тесты аутентификации; здесь токен выпускается напрямую, без лимита попыток входа
   const sessionCookie = (userId: string) =>
     `access_token=${app.get(TokenService).signPair(userId).accessToken}`;
 
@@ -238,7 +236,6 @@ describe("RBAC admin API (e2e)", () => {
     });
 
     it("lets an all-actions grant follow a removed action", async () => {
-      // delete явно перечислено в назначении роли user
       await api
         .put(`/admin/rbac/permissions/${await idOf("permissions", "users")}`, {
           name: "users",
@@ -246,7 +243,6 @@ describe("RBAC admin API (e2e)", () => {
         })
         .expect(409);
 
-      // delete_any входит только в назначение admin со всеми действиями
       const response = await api
         .put(`/admin/rbac/permissions/${await idOf("permissions", "users")}`, {
           name: "users",

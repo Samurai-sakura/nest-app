@@ -87,7 +87,6 @@ describe("RBAC policy (e2e)", () => {
     expect(await version()).toBe(before);
   });
 
-  // сервис не даёт записать такую связь; если она всё же попала в базу, права она не открывает
   it("ignores an action of another permission in a grant", async () => {
     const grantId = await grant(false);
     const [{ id: otherPermissionId }] = await db.query(

@@ -59,7 +59,6 @@ export class SessionService {
       });
     } catch (error) {
       const message = (error as Error).message;
-      // для защищённой операции это сбой авторизации: не 401 и не потеря сессии
       if (use === "access") {
         this.logger.error(`Authorization unavailable reason=users: ${message}`);
         throw authorizationUnavailable();

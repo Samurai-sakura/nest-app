@@ -28,9 +28,6 @@ const OPERATIONS: Record<string, string> = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// закрывает то, что не проходит через RbacAdminService.change: отказ валидации тела и пути
-// случается в pipes до сервиса, а чтение списков выполняется без транзакции изменения.
-// Pipes работают внутри next.handle(), поэтому их ошибки видны здесь вместе с контекстом маршрута
 @Injectable()
 export class RbacAuditInterceptor implements NestInterceptor {
   constructor(private readonly admin: RbacAdminService) {}
@@ -42,7 +39,6 @@ export class RbacAuditInterceptor implements NestInterceptor {
   }
 
   private handle(context: ExecutionContext, error: unknown) {
-    // ошибки сервиса уже с кодом и уже записаны в журнал
     if (error instanceof HttpException && hasCode(error)) {
       return error;
     }
@@ -58,7 +54,6 @@ export class RbacAuditInterceptor implements NestInterceptor {
     return {
       operation: `${entity}.${OPERATIONS[context.getHandler().name]}`,
       entity,
-      // невалидный id из пути не пишется в журнал как есть
       entityId: id === undefined ? undefined : UUID_PATTERN.test(id) ? id : "invalid",
       actorUserId: request.userId ?? "unknown",
     };

@@ -79,10 +79,17 @@ describe("Registration (e2e)", () => {
         password,
       }).expect(201);
 
-      expect(body).toMatchObject({ email, status: "active" });
+      expect(body).toEqual({ id: expect.any(String), email, status: "active" });
       expect(JSON.stringify(body)).not.toContain(password);
       expect(JSON.stringify(body)).not.toContain("argon2");
       expect(mail.sendOtp).not.toHaveBeenCalled();
+    });
+
+    it("ignores a name: it is set in the profile, not at registration", async () => {
+      const { body } = await register({ email, password, name: "Alex" }).expect(201);
+
+      expect(body).not.toHaveProperty("name");
+      expect((await findUser()).display_name).toBeNull();
     });
 
     it("stores a salted slow hash and keeps spaces in the password", async () => {

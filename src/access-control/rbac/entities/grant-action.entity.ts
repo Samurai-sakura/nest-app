@@ -2,7 +2,6 @@ import { Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
 import { Grant } from "./grant.entity";
 import { PermissionAction } from "./permission-action.entity";
 
-// действие должно принадлежать разрешению назначения: это проверяет сервис RBAC
 @Entity("grant_actions")
 @Index("idx_grant_actions_action", ["permissionActionId"])
 export class GrantAction {

@@ -11,7 +11,6 @@ export interface RbacDecision {
 
 interface PolicySnapshot {
   version: number;
-  // userId → набор "permission@action" по всем ролям пользователя
   rights: Map<string, Set<string>>;
 }
 
@@ -21,7 +20,6 @@ interface RightRow {
   action: string;
 }
 
-// all_actions охватывает все действия разрешения, иначе только перечисленные в grant_actions
 const RIGHTS_QUERY = `
   SELECT ur."user_id", p."name" AS "permission", pa."name" AS "action"
   FROM "user_roles" ur
@@ -46,12 +44,10 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     private readonly policyRepository: Repository<RbacPolicyState>,
   ) {}
 
-  // без начального снимка приложение стартует, но не проходит readiness
   public async onApplicationBootstrap() {
     try {
       await this.reload();
     } catch {
-      // причина уже в журнале; следующая проверка попробует загрузить снова
     }
   }
 
@@ -59,8 +55,6 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     return this.snapshot !== null;
   }
 
-  // readiness сам пробует загрузить снимок: без готовности запросов не будет,
-  // и снимку не на чем было бы восстановиться
   public async checkReady() {
     if (this.snapshot) {
       return true;
@@ -73,7 +67,6 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     }
   }
 
-  // неизвестные пользователь, разрешение или действие дают запрет, а не ошибку
   public async authorize(
     userId: string,
     permission: string,
@@ -106,8 +99,6 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     return state.version;
   }
 
-  // версия только растёт, поэтому подходит любой снимок не старше прочитанной.
-  // Загрузка, к которой присоединились, могла начаться до чтения версии: тогда нужна ещё одна
   private async snapshotFor(version: number) {
     let snapshot = this.snapshot;
     if (!snapshot || snapshot.version < version) {
@@ -119,7 +110,6 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     return snapshot;
   }
 
-  // одна загрузка на все ожидающие проверки
   private reload() {
     this.loading ??= this.load().finally(() => {
       this.loading = null;
@@ -127,8 +117,6 @@ export class RbacPolicyService implements OnApplicationBootstrap {
     return this.loading;
   }
 
-  // версия и права читаются из одного снимка базы и заменяют старые целиком.
-  // При сбое старые права больше не используются
   private async load(): Promise<PolicySnapshot> {
     try {
       const snapshot = await this.policyRepository.manager.transaction(

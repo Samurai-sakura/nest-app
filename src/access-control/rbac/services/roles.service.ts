@@ -44,7 +44,6 @@ export class RolesService {
     );
   }
 
-  // роль с назначениями или пользователями не удаляется: RESTRICT в базе даёт 409
   public async remove(actorUserId: string, roleId: string) {
     await this.admin.change(
       { operation: "role.delete", entity: "role", entityId: roleId, actorUserId },

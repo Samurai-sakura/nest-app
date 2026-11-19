@@ -14,7 +14,6 @@ import { Role } from "./role.entity";
 import { Permission } from "./permission.entity";
 import { GrantAction } from "./grant-action.entity";
 
-// allActions=true охватывает и действия, добавленные позже; тогда grant_actions пуст
 @Entity("grants")
 @Unique("uq_grants_role_permission", ["roleId", "permissionId"])
 @Index("idx_grants_permission", ["permissionId"])

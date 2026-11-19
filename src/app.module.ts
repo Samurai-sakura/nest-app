@@ -9,11 +9,13 @@ import { AuthorizationModule } from "./access-control/authorization/authorizatio
 import { HealthModule } from "./health/health.module";
 import { APP_FILTER } from "@nestjs/core";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
+import { UsersModule } from "./users/users.module";
 
 @Module({
   imports: [
     RegistrationModule,
     AuthenticationModule,
+    UsersModule,
     RbacModule,
     AuthorizationModule,
     HealthModule,

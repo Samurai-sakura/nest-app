@@ -1,4 +1,5 @@
 import { existsSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 
 export const TEST_DB = "backend_app_test";
@@ -9,11 +10,11 @@ if (existsSync(envFile)) {
 }
 
 process.env.POSTGRES_DB = TEST_DB;
-// id администратора из .env существует только в dev-базе; тесты bootstrap задают его сами.
-// Пустая строка, а не delete: без ключа в process.env ConfigService берёт значение из .env
 process.env.RBAC_BOOTSTRAP_ADMIN_USER_ID = "";
 process.env.APP_URL = "http://localhost:3200";
 process.env.FRONTEND_ORIGIN = "http://localhost:3200";
+process.env.PUBLIC_API_BASE_URL = "http://localhost:3200";
+process.env.PHOTO_STORAGE_DIR = join(tmpdir(), "backend-app-e2e-photos");
 process.env.CONFIRMATION_HMAC_SECRET = "e2e-registration-confirmation-hmac-key";
 process.env.JWT_ACCESS_SECRET = "e2e-jwt-access-secret-0123456789abcdef";
 process.env.JWT_REFRESH_SECRET = "e2e-jwt-refresh-secret-0123456789abcdef";

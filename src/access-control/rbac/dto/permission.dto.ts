@@ -12,7 +12,6 @@ import { RBAC_NAME_PATTERN } from "../helpers/rbac-name";
 import { normalizeNames } from "../helpers/normalize";
 import { NAME_FORMAT_MESSAGE, RoleBodyDto, RoleResponse } from "./role.dto";
 
-// имя и описание разрешения проверяются так же, как у роли
 export class PermissionBodyDto extends RoleBodyDto {
   @ApiProperty({
     example: ["read", "update"],

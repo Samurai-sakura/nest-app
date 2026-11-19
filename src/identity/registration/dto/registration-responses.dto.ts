@@ -1,11 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class RegisteredUserResponse {
   @ApiProperty({ format: "uuid" })
   id: string;
-
-  @ApiPropertyOptional({ nullable: true, example: "Alex" })
-  name?: string | null;
 
   @ApiProperty({ example: "abc@gmail.com" })
   email: string;

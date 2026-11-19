@@ -41,7 +41,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       )
     `);
 
-    // действие удаляется вместе с разрешением, но не пока входит в конкретное назначение
     await queryRunner.query(`
       CREATE TABLE "permission_actions" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -55,7 +54,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       )
     `);
 
-    // роль и разрешение нельзя удалить, пока на них есть назначение
     await queryRunner.query(`
       CREATE TABLE "grants" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -76,8 +74,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       `CREATE INDEX "idx_grants_permission" ON "grants" ("permission_id")`,
     );
 
-    // связка без неключевых полей (BCNF): принадлежность действия разрешению назначения
-    // проверяет сервис RBAC, а проверка доступа соединяет действие только с разрешением назначения
     await queryRunner.query(`
       CREATE TABLE "grant_actions" (
         "grant_id" uuid NOT NULL,
@@ -93,7 +89,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       `CREATE INDEX "idx_grant_actions_action" ON "grant_actions" ("permission_action_id")`,
     );
 
-    // роль нельзя удалить, пока она назначена пользователю
     await queryRunner.query(`
       CREATE TABLE "user_roles" (
         "user_id" uuid NOT NULL,
@@ -109,7 +104,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       `CREATE INDEX "idx_user_roles_role" ON "user_roles" ("role_id")`,
     );
 
-    // одна строка: CHECK не даёт вставить вторую
     await queryRunner.query(`
       CREATE TABLE "rbac_policy_state" (
         "id" smallint NOT NULL,
@@ -124,8 +118,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
       `INSERT INTO "rbac_policy_state" ("id", "version") VALUES (1, 0)`,
     );
 
-    // версия растёт в той же транзакции, что и изменение RBAC, даже при ручном SQL.
-    // Один раз на запрос, а не на строку; UPDATE блокирует строку и выстраивает изменения в очередь
     await queryRunner.query(`
       CREATE FUNCTION "bump_rbac_policy_version"() RETURNS trigger AS $$
       BEGIN
@@ -153,7 +145,6 @@ export class CreateRbacTablesMigration implements MigrationInterface {
     await queryRunner.query(`DROP TABLE "permission_actions"`);
     await queryRunner.query(`DROP TABLE "permissions"`);
     await queryRunner.query(`DROP TABLE "roles"`);
-    // триггеры удалены вместе с таблицами, функция больше ни от чего не зависит
     await queryRunner.query(`DROP FUNCTION "bump_rbac_policy_version"()`);
   }
 }

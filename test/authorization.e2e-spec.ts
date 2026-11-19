@@ -29,14 +29,12 @@ const password = "Passw0rd-secret";
 const evil = "https://evil.example";
 const handler = jest.fn();
 
-// защищённых бизнес-операций в задании нет: маршруты существуют только в тесте
 @Controller("test-reports")
 class ReportsController {
   @Get(":id")
   @RequirePermission("reports", "read")
   public read(@Param("id") id: string, @CurrentUserId() userId: string) {
     handler(userId);
-    // ресурс ищется только после допуска
     if (id !== "42") {
       throw new NotFoundException();
     }
@@ -90,7 +88,6 @@ class ForgottenController {
 
 describe("Authorization chain (e2e)", () => {
   const logged: jest.SpyInstance[] = [];
-  // шпионы на сервисы снимаются после каждого теста, иначе следующий видит чужие вызовы
   const serviceSpies: jest.SpyInstance[] = [];
   let app: INestApplication;
   let db: DataSource;
