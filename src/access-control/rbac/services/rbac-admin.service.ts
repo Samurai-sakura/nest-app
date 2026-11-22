@@ -4,6 +4,7 @@ import { DataSource, EntityManager, QueryFailedError } from "typeorm";
 import { POLICY_STATE_ID } from "../entities/rbac-policy-state.entity";
 import { lastManagerConflict, rbacConflict, rbacUnavailable } from "../helpers/rbac-errors";
 import { isDatabaseUnavailable } from "../../../common/errors/database-unavailable";
+import { ensureActiveManager, lockPolicy } from "../helpers/policy-lock";
 
 export interface RbacChange {
   operation: string;
@@ -18,22 +19,6 @@ const UNIQUE_CONFLICTS: Record<string, [string, string]> = {
   uq_grants_role_permission: ["grant_exists", "The role already has a grant for this permission"],
 };
 
-const ACTIVE_MANAGER_QUERY = `
-  SELECT EXISTS (
-    SELECT 1
-    FROM "user_roles" ur
-    JOIN "users" u ON u."id" = ur."user_id" AND u."status" = 'active'
-    JOIN "grants" g ON g."role_id" = ur."role_id"
-    JOIN "permissions" p ON p."id" = g."permission_id" AND p."name" = 'rbac'
-    JOIN "permission_actions" pa ON pa."permission_id" = p."id" AND pa."name" = 'manage'
-    WHERE g."all_actions"
-      OR EXISTS (
-        SELECT 1 FROM "grant_actions" ga
-        WHERE ga."grant_id" = g."id" AND ga."permission_action_id" = pa."id"
-      )
-  ) AS "exists"
-`;
-
 @Injectable()
 export class RbacAdminService {
   private readonly logger = new Logger(RbacAdminService.name);
@@ -43,14 +28,11 @@ export class RbacAdminService {
   public async change<T>(change: RbacChange, work: (manager: EntityManager) => Promise<T>) {
     try {
       const { result, version } = await this.dataSource.transaction(async (manager) => {
-        await manager.query(`SELECT 1 FROM "rbac_policy_state" WHERE "id" = $1 FOR UPDATE`, [
-          POLICY_STATE_ID,
-        ]);
+
+        await lockPolicy(manager);
         const result = await work(manager);
-        const [{ exists }] = await manager.query(ACTIVE_MANAGER_QUERY);
-        if (!exists) {
-          throw lastManagerConflict();
-        }
+        await ensureActiveManager(manager);
+
         const [{ version }] = await manager.query(
           `SELECT "version" FROM "rbac_policy_state" WHERE "id" = $1`,
           [POLICY_STATE_ID],

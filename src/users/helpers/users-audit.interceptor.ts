@@ -9,29 +9,60 @@ import {
 import { Observable, catchError, tap, throwError } from "rxjs";
 import type { AuthenticatedRequest } from "../../access-control/authorization/guards/authorization.guard";
 
-const OPERATIONS: Record<string, string> = {
-  getUser: "users.profile",
-  getPhoto: "users.photo",
+const AUDITED_FIELDS = ["displayName", "email", "status"];
+
+interface Operation {
+  name: string;
+  kind: "read" | "update";
+}
+
+const OPERATIONS: Record<string, Operation> = {
+  getUser: { name: "users.profile", kind: "read" },
+  getPhoto: { name: "users.photo", kind: "read" },
+  updateProfile: { name: "users.update", kind: "update" },
 };
 
-const RESULTS: Record<number, { result: string; withTarget: boolean }> = {
+const READ_RESULTS: Record<number, { result: string; withTarget: boolean }> = {
   403: { result: "forbidden", withTarget: false },
   429: { result: "rate_limited", withTarget: false },
   404: { result: "not_found", withTarget: true },
   503: { result: "unavailable", withTarget: true },
 };
 
+const UPDATE_RESULTS: Record<number, string> = {
+  400: "invalid",
+  403: "forbidden",
+  404: "not_found",
+  409: "conflict",
+  429: "rate_limited",
+  503: "unavailable",
+};
+
+const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
 @Injectable()
 export class UsersAuditInterceptor implements NestInterceptor {
   private readonly logger = new Logger("UsersAudit");
 
   public intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const startedAt = Date.now();
+    const operation = OPERATIONS[context.getHandler().name];
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+
+    return operation.kind === "update"
+      ? this.auditUpdate(operation, request, next)
+      : this.auditRead(operation, request, next);
+  }
+
+  private auditRead(
+    operation: Operation,
+    request: AuthenticatedRequest,
+    next: CallHandler,
+  ): Observable<unknown> {
+    const startedAt = Date.now();
     const targetUserId = request.params?.userId as string;
     const actorUserId = request.userId ?? "unknown";
     const scope = targetUserId === actorUserId ? "self" : "foreign";
-    const event = `operation=${OPERATIONS[context.getHandler().name]} scope=${scope} actorUserId=${actorUserId}`;
+    const event = `operation=${operation.name} scope=${scope} actorUserId=${actorUserId}`;
     const duration = () => `durationMs=${Date.now() - startedAt}`;
 
     return next.handle().pipe(
@@ -43,16 +74,62 @@ export class UsersAuditInterceptor implements NestInterceptor {
         }
       }),
       catchError((error: unknown) => {
-        const known = error instanceof HttpException ? RESULTS[error.getStatus()] : undefined;
+        const known = error instanceof HttpException ? READ_RESULTS[error.getStatus()] : undefined;
         if (known) {
-          const body = (error as HttpException).getResponse() as { code?: string };
           const target = known.withTarget ? ` targetUserId=${targetUserId}` : "";
           this.logger.warn(
-            `User read result=${known.result} ${event}${target} code=${body.code} ${duration()}`,
+            `User read result=${known.result} ${event}${target} code=${errorCode(error as HttpException)} ${duration()}`,
           );
         }
         return throwError(() => error);
       }),
     );
   }
+
+  private auditUpdate(
+    operation: Operation,
+    request: AuthenticatedRequest,
+    next: CallHandler,
+  ): Observable<unknown> {
+    const startedAt = Date.now();
+    const rawTarget = request.params?.userId as string | undefined;
+    const targetUserId = rawTarget && USER_ID_PATTERN.test(rawTarget) ? rawTarget : "invalid";
+    const actorUserId = request.userId ?? "unknown";
+    const scope = targetUserId === actorUserId ? "self" : "foreign";
+    const event = `operation=${operation.name} scope=${scope} actorUserId=${actorUserId} targetUserId=${targetUserId} fields=${fieldNames(request.body)}`;
+    const duration = () => `durationMs=${Date.now() - startedAt}`;
+
+    return next.handle().pipe(
+      tap(() => {
+        this.logger.log(`User update result=success ${event} ${duration()}`);
+      }),
+      catchError((error: unknown) => {
+        const result = error instanceof HttpException ? UPDATE_RESULTS[error.getStatus()] : undefined;
+        if (result) {
+          this.logger.warn(
+            `User update result=${result} ${event} code=${errorCode(error as HttpException)} ${duration()}`,
+          );
+        } else {
+          this.logger.error(`User update result=failed ${event} ${duration()}`);
+        }
+        return throwError(() => error);
+      }),
+    );
+  }
+}
+
+function fieldNames(body: unknown) {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return "none";
+  }
+  const names = Object.keys(body).filter((key) => AUDITED_FIELDS.includes(key));
+  return names.length > 0 ? names.join(",") : "none";
+}
+
+function errorCode(error: HttpException) {
+  const body = error.getResponse();
+  if (typeof body === "object" && body !== null && "code" in body) {
+    return (body as { code: string }).code;
+  }
+  return error.getStatus() === 400 ? "validation_failed" : "unknown";
 }
