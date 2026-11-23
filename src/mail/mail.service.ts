@@ -51,4 +51,22 @@ export class MailService {
       text: `Перейдите по ссылке, чтобы войти: ${link}\nСсылка действует 10 минут.\nЕсли вы не входили, смените пароль.`,
     });
   }
+
+  public async sendEmailChangeOtp(to: string, code: string) {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: "Код подтверждения нового email",
+      text: `Ваш код для подтверждения нового email: ${code}. Действует 10 минут.\nЕсли вы не запрашивали смену email, просто проигнорируйте это письмо: адрес не будет привязан к аккаунту.`,
+    });
+  }
+
+  public async sendEmailChangeMagicLink(to: string, link: string) {
+    await this.transporter.sendMail({
+      from: this.from,
+      to,
+      subject: "Подтверждение нового email",
+      text: `Перейдите по ссылке, чтобы подтвердить новый email: ${link}\nСсылка действует 10 минут.\nЕсли вы не запрашивали смену email, просто проигнорируйте это письмо: адрес не будет привязан к аккаунту.`,
+    });
+  }
 }

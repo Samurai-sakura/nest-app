@@ -1,15 +1,7 @@
-import {
-  BadRequestException, ConflictException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { HttpException, Inject, Injectable, Logger } from "@nestjs/common";
 import { User } from "../entities/user.entity";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
-import { DataSource, FindOptionsSelect, IsNull, QueryFailedError, Repository } from "typeorm";
+import { DataSource, EntityManager, FindOptionsSelect, IsNull, Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { STATUSES_WITHOUT_PHOTO, toUserProfile } from "../helpers/user-profile";
 import type { UserProfileResponse } from "../dto/user-profile.dto";
@@ -21,16 +13,24 @@ import { UpdateUserDto } from "../dto/update-user.dto";
 import { ensureActiveManager, lockPolicy } from "../../access-control/rbac/helpers/policy-lock";
 import { LoginChallenge } from "../../identity/authentication/entities/login-challenge.entity";
 import { EmailChangeChallenge } from "../entities/email-change-challenge.entity";
-
-const USERS_EMAIL_UNIQUE = "UQ_97672ac88f789774dd47f7c8be3";
-
-function isEmailConflict(error: unknown) {
-  if (!(error instanceof QueryFailedError)) {
-    return false;
-  }
-  const driverError = error.driverError as { code?: string; constraint?: string };
-  return driverError.code === "23505" && driverError.constraint === USERS_EMAIL_UNIQUE;
-}
+import { isEmailConflict } from "../helpers/email-conflict";
+import {
+  emailTaken,
+  emptyUpdate,
+  invalidPhoto,
+  photoNotFound,
+  photoUnavailable,
+  unsupportedPhotoType,
+  userNotFound,
+  usersUnavailable,
+  userStateConflict,
+} from "../helpers/users-errors";
+import { normalizePhoto } from "../helpers/photo-normalizer";
+import { randomBytes } from "crypto";
+import {
+  StorageCleanupJob,
+  type StorageCleanupReason,
+} from "../../storage/entities/storage-cleanup-job.entity";
 
 @Injectable()
 export class UsersService {
@@ -58,11 +58,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException({
-        statusCode: HttpStatus.NOT_FOUND,
-        code: "user_not_found",
-        message: "User not found",
-      });
+      throw userNotFound();
     }
 
     return this.toProfile(user);
@@ -89,11 +85,7 @@ export class UsersService {
       !user.photoKey ||
       STATUSES_WITHOUT_PHOTO.includes(user.status)
     ) {
-      throw new NotFoundException({
-        statusCode: HttpStatus.NOT_FOUND,
-        code: "photo_not_found",
-        message: "Photo not found",
-      });
+      throw photoNotFound();
     }
 
     const result = await this.photoStorage.read(user.photoKey);
@@ -111,11 +103,7 @@ export class UsersService {
         `Photo unavailable reason=storage_unavailable userId=${userId}`,
       );
     }
-    throw new ServiceUnavailableException({
-      statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-      code: "photo_unavailable",
-      message: "Photo is temporarily unavailable",
-    });
+    throw photoUnavailable();
   }
 
   private async findUser(userId: string, select: FindOptionsSelect<User>) {
@@ -131,21 +119,20 @@ export class UsersService {
       this.logger.error(
         `User data unavailable reason=database userId=${userId}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "users_unavailable",
-        message: "User data is temporarily unavailable",
-      });
+      throw usersUnavailable();
     }
   }
 
-  public async updateUserProfile(userId: string, update: UpdateUserDto): Promise<UserProfileResponse> {
-    if (update.displayName === undefined && update.email === undefined && update.status === undefined) {
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        code: "empty_update",
-        message: "At least one field is required",
-      });
+  public async updateUserProfile(
+    userId: string,
+    update: UpdateUserDto,
+  ): Promise<UserProfileResponse> {
+    if (
+      update.displayName === undefined &&
+      update.email === undefined &&
+      update.status === undefined
+    ) {
+      throw emptyUpdate();
     }
 
     let transition: string | undefined;
@@ -162,23 +149,19 @@ export class UsersService {
         });
 
         if (!user) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            code: "user_not_found",
-            message: "User not found",
-          })
+          throw userNotFound();
         }
 
-        if (user.status !== 'active' && user.status !== "blocked") {
-          throw new ConflictException({
-            statusCode: HttpStatus.CONFLICT,
-            code: "user_state_conflict",
-            message: "User cannot be changed in its current state",
-          });
+        if (user.status !== "active" && user.status !== "blocked") {
+          throw userStateConflict();
         }
 
-        const changes: Partial<Pick<User, "displayName" | "email" | "status">> = {};
-        if (update.displayName !== undefined && update.displayName !== user.displayName) {
+        const changes: Partial<Pick<User, "displayName" | "email" | "status">> =
+          {};
+        if (
+          update.displayName !== undefined &&
+          update.displayName !== user.displayName
+        ) {
           changes.displayName = update.displayName;
         }
         if (update.email !== undefined && update.email !== user.email) {
@@ -194,11 +177,7 @@ export class UsersService {
         }
 
         const updatedAt = new Date();
-        await manager.update(
-          User,
-          { id: userId },
-          { ...changes, updatedAt },
-        );
+        await manager.update(User, { id: userId }, { ...changes, updatedAt });
 
         if (changes.email) {
           await manager.update(
@@ -224,21 +203,20 @@ export class UsersService {
         }
 
         return this.toProfile({ ...user, ...changes, updatedAt });
-
       });
 
       if (transition) {
-        this.logger.log(`User status changed transition=${transition} userId=${userId}`);
+        this.logger.log(
+          `User status changed transition=${transition} userId=${userId}`,
+        );
       }
       return profile;
     } catch (error) {
       if (isEmailConflict(error)) {
-        this.logger.warn(`User update rejected reason=email_conflict userId=${userId}`);
-        throw new ConflictException({
-          statusCode: HttpStatus.CONFLICT,
-          code: "email_taken",
-          message: "Email is already in use",
-        });
+        this.logger.warn(
+          `User update rejected reason=email_conflict userId=${userId}`,
+        );
+        throw emailTaken();
       }
       if (!isDatabaseUnavailable(error)) {
         throw error;
@@ -246,11 +224,127 @@ export class UsersService {
       this.logger.error(
         `User data unavailable reason=database userId=${userId}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "users_unavailable",
-        message: "User data is temporarily unavailable",
+      throw usersUnavailable();
+    }
+  }
+
+  public async replacePhoto(
+    userId: string,
+    data: Buffer,
+    declaredMime: string,
+  ): Promise<UserProfileResponse> {
+    const photo = await normalizePhoto(data, declaredMime);
+
+    if (photo.status === "unsupported") {
+      this.logger.warn(
+        `Photo rejected reason=unsupported_type userId=${userId}`,
+      );
+      throw unsupportedPhotoType();
+    }
+    if (photo.status === "invalid") {
+      this.logger.warn(
+        `Photo rejected reason=${photo.reason} userId=${userId}`,
+      );
+      throw invalidPhoto();
+    }
+    const key = randomBytes(16).toString("base64url");
+    const written = await this.photoStorage.write(key, photo.data);
+    if (written.status !== "written") {
+      this.logger.error(
+        `Photo upload failed reason=storage_unavailable userId=${userId}`,
+      );
+      throw photoUnavailable();
+    }
+
+    try {
+      const { profile, jobId } = await this.dataSource.transaction(async (manager) => {
+        const user = await manager.findOne(User, {
+          where: { id: userId },
+          lock: { mode: "pessimistic_write" },
+        });
+        if (!user) {
+          throw userNotFound();
+        }
+        if (user.status !== "active" && user.status !== "blocked") {
+          throw userStateConflict();
+        }
+
+        const updatedAt = new Date();
+        await manager.update(User, { id: userId }, { photoKey: key, updatedAt });
+        const jobId = user.photoKey
+          ? await this.queueCleanup(manager, user.photoKey, "photo_replaced")
+          : null;
+        return {
+          profile: this.toProfile({ ...user, photoKey: key, updatedAt }),
+          jobId,
+        };
       });
+
+      this.logger.log(`User photo ${jobId ? "replaced" : "uploaded"} userId=${userId}`);
+      this.logCleanupQueued(jobId, "photo_replaced");
+      return profile;
+    } catch (error) {
+      await this.photoStorage.delete(key);
+      if (error instanceof HttpException || !isDatabaseUnavailable(error)) {
+        throw error;
+      }
+      this.logger.error(
+        `User data unavailable reason=database userId=${userId}`,
+      );
+      throw usersUnavailable();
+    }
+  }
+
+  public async deletePhoto(userId: string): Promise<void> {
+    try {
+      const jobId = await this.dataSource.transaction(async (manager) => {
+        const user = await manager.findOne(User, {
+          where: { id: userId },
+          select: { id: true, photoKey: true, status: true },
+          lock: { mode: "pessimistic_write" },
+        });
+
+        if (!user) {
+          throw userNotFound();
+        }
+        if (user.status !== "active" && user.status !== "blocked") {
+          throw userStateConflict();
+        }
+        if (user.photoKey === null) {
+          return null;
+        }
+
+        await manager.update(User, { id: userId }, { photoKey: null, updatedAt: new Date() });
+        return this.queueCleanup(manager, user.photoKey, "photo_cleared");
+      });
+
+      this.logger.log(
+        `User photo ${jobId ? "cleared" : "clear skipped reason=no_photo"} userId=${userId}`,
+      );
+      this.logCleanupQueued(jobId, "photo_cleared");
+    } catch (error) {
+      if (error instanceof HttpException || !isDatabaseUnavailable(error)) {
+        throw error;
+      }
+      this.logger.error(
+        `User data unavailable reason=database userId=${userId}`,
+      );
+      throw usersUnavailable();
+    }
+  }
+
+  private async queueCleanup(
+    manager: EntityManager,
+    objectKey: string,
+    reason: StorageCleanupReason,
+  ): Promise<string> {
+    const { identifiers } = await manager.insert(StorageCleanupJob, { objectKey, reason });
+    return identifiers[0].id as string;
+  }
+
+  private logCleanupQueued(jobId: string | null, reason: StorageCleanupReason) {
+    if (jobId) {
+      this.logger.log(`Storage cleanup queued jobId=${jobId} reason=${reason}`);
     }
   }
 }

@@ -2,6 +2,7 @@ import { existsSync } from "fs";
 import { DataSource } from "typeorm";
 import { User } from "../users/entities/user.entity";
 import { EmailChangeChallenge } from "../users/entities/email-change-challenge.entity";
+import { StorageCleanupJob } from "../storage/entities/storage-cleanup-job.entity";
 import { RegistrationConfirmation } from "../identity/registration/entities/registration-confirmation.entity";
 import { LoginChallenge } from "../identity/authentication/entities/login-challenge.entity";
 import {
@@ -11,6 +12,7 @@ import { CreateLoginChallengesMigration } from "./migrations/create-login-challe
 import { CreateRbacTablesMigration } from "./migrations/create-rbac-tables.migration";
 import { AddUserProfileColumnsMigration } from "./migrations/add-user-profile-columns.migration";
 import { CreateEmailChangeChallengesMigration } from "./migrations/create-email-change-challenges.migration";
+import { CreateStorageCleanupJobsMigration } from "./migrations/create-storage-cleanup-jobs.migration";
 import { Role } from "../access-control/rbac/entities/role.entity";
 import { Permission } from "../access-control/rbac/entities/permission.entity";
 import { PermissionAction } from "../access-control/rbac/entities/permission-action.entity";
@@ -42,6 +44,7 @@ export default new DataSource({
     UserRole,
     RbacPolicyState,
     EmailChangeChallenge,
+    StorageCleanupJob,
   ],
   migrations: [
     CreateAuthTablesMigration,
@@ -49,5 +52,6 @@ export default new DataSource({
     CreateRbacTablesMigration,
     AddUserProfileColumnsMigration,
     CreateEmailChangeChallengesMigration,
+    CreateStorageCleanupJobsMigration,
   ],
 });

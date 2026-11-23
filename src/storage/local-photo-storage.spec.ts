@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import type { Readable } from "stream";
@@ -110,6 +110,84 @@ describe("LocalPhotoStorage", () => {
 
     await expect(storage.delete("user-1/photo.webp")).resolves.toEqual({ status: "unavailable" });
     await chmod(join(root, "user-1"), 0o700);
+  });
+
+  describe("write", () => {
+    const bytes = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0xff, 0x10]);
+
+    it("stores the bytes so that read returns them with their size", async () => {
+      await expect(storage.write("photo-key", bytes)).resolves.toEqual({ status: "written" });
+
+      const result = await storage.read("photo-key");
+
+      expect(result).toMatchObject({ status: "found", size: bytes.length });
+      expect(await readAll((result as { stream: Readable }).stream)).toEqual(bytes);
+    });
+
+    it("leaves no temporary files behind", async () => {
+      await storage.write("photo-key", bytes);
+
+      expect(await readdir(root)).toEqual(["photo-key"]);
+    });
+
+    it.each(["../escape", "/etc/escape", "a/../../escape", ""])(
+      "never writes outside the folder for the key %p",
+      async (key) => {
+        await expect(storage.write(key, bytes)).resolves.toEqual({ status: "unavailable" });
+
+        expect(await readdir(base)).toEqual(["photos"]);
+        expect(await readdir(root)).toEqual([]);
+      },
+    );
+
+    it("reports a failed write as unavailable without the key or a temporary file", async () => {
+      await chmod(root, 0o500);
+
+      await expect(storage.write("photo-key", bytes)).resolves.toEqual({ status: "unavailable" });
+
+      expect(error).toHaveBeenCalledWith("Photo storage unavailable operation=write code=EACCES");
+      expect(error.mock.calls.join("\n")).not.toContain("photo-key");
+      await chmod(root, 0o700);
+      expect(await readdir(root)).toEqual([]);
+    });
+  });
+
+  describe("list", () => {
+    const hourAgo = () => new Date(Date.now() - 60 * 60_000);
+    const age = (path: string, minutes: number) => {
+      const time = new Date(Date.now() - minutes * 60_000);
+      return utimes(path, time, time);
+    };
+
+    it("lists only files older than the cutoff, with / in nested keys", async () => {
+      await age(await put("old-key", "a"), 61);
+      await age(await put("user-1/old.webp", "b"), 120);
+      await put("fresh-key", "c");
+
+      const result = await storage.list(hourAgo());
+
+      expect(result.status).toBe("listed");
+      expect((result as { keys: string[] }).keys.sort()).toEqual(["old-key", "user-1/old.webp"]);
+    });
+
+    it("returns keys that read and delete accept", async () => {
+      await age(await put("user-1/old.webp", "b"), 61);
+
+      const { keys } = (await storage.list(hourAgo())) as { keys: string[] };
+
+      await expect(storage.delete(keys[0])).resolves.toEqual({ status: "deleted" });
+    });
+
+    it("lists an empty folder", async () => {
+      await expect(storage.list(hourAgo())).resolves.toEqual({ status: "listed", keys: [] });
+    });
+
+    it("reports an unreadable folder as unavailable", async () => {
+      await rm(root, { recursive: true });
+
+      await expect(storage.list(hourAgo())).resolves.toEqual({ status: "unavailable" });
+      expect(error).toHaveBeenCalledWith("Photo storage unavailable operation=list code=ENOENT");
+    });
   });
 
   it("uses storage/photos when the variable is not set", () => {

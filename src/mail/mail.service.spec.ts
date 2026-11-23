@@ -52,6 +52,8 @@ describe("MailService", () => {
     ["sendMagicLink", "http://localhost:3200/auth/register/confirm?token=abc", "Подтверждение регистрации"],
     ["sendLoginOtp", "654321", "Код для входа"],
     ["sendLoginMagicLink", "http://localhost:3200/auth/login/confirm#token=id.secret", "Ссылка для входа"],
+    ["sendEmailChangeOtp", "246810", "Код подтверждения нового email"],
+    ["sendEmailChangeMagicLink", "http://localhost:3200/users/email-change/confirm#token=id.secret", "Подтверждение нового email"],
   ] as const)("%s sends the secret only in the message body", async (method, secret, subject) => {
     await service[method]("abc@gmail.com", secret);
 
@@ -66,6 +68,18 @@ describe("MailService", () => {
     expect(message.text).toContain("10 минут");
     expect(message.subject).not.toContain(secret);
   });
+
+  it.each(["sendEmailChangeOtp", "sendEmailChangeMagicLink"] as const)(
+    "%s tells the new address owner to ignore an unexpected request",
+    async (method) => {
+      await service[method]("new@gmail.com", "secret");
+
+      const message = sendMail.mock.calls[0][0];
+      expect(message.to).toBe("new@gmail.com");
+      expect(message.text).toContain("проигнорируйте");
+      expect(message.text).not.toContain("смените пароль");
+    },
+  );
 
   it("passes a delivery failure to the caller", async () => {
     sendMail.mockRejectedValue(new Error("smtp down"));

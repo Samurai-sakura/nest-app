@@ -1,4 +1,8 @@
-import { HttpStatus, UnauthorizedException } from "@nestjs/common";
+import {
+  HttpStatus,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 
 // одинаковый ответ для неизвестного email, неверного пароля и неактивного пользователя
 export function invalidCredentials() {
@@ -16,4 +20,8 @@ export function invalidSession() {
     code: "invalid_session",
     message: "Session is invalid or expired",
   });
+}
+
+export function loginUnavailable() {
+  return new ServiceUnavailableException("Login is temporarily unavailable");
 }

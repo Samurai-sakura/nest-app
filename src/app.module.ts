@@ -10,6 +10,7 @@ import { HealthModule } from "./health/health.module";
 import { APP_FILTER } from "@nestjs/core";
 import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 import { UsersModule } from "./users/users.module";
+import { ScheduleModule } from "@nestjs/schedule";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UsersModule } from "./users/users.module";
     AuthorizationModule,
     HealthModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => [

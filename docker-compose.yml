@@ -23,6 +23,19 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+  rustfs:
+    image: rustfs/rustfs:1.0.0
+    container_name: backend-app-rustfs
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY_ID:-BACKENDAPPDEV}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_ACCESS_KEY:-BACKENDAPPDEVSECRET2026}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs_data:/data
 
 volumes:
   postgres_data:
+  rustfs_data:

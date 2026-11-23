@@ -1,8 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { IsUUID, Matches, ValidateIf } from "class-validator";
-
-export const LOGIN_LINK_TOKEN_PATTERN =
-  /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/;
+import { CONFIRMATION_LINK_TOKEN_PATTERN } from "../../confirmation/confirmation-secret";
 
 export class ConfirmLoginDto {
   @ApiPropertyOptional({
@@ -26,6 +24,6 @@ export class ConfirmLoginDto {
       dto.token !== undefined ||
       (dto.attemptId === undefined && dto.code === undefined),
   )
-  @Matches(LOGIN_LINK_TOKEN_PATTERN, { message: "token has an invalid format" })
+  @Matches(CONFIRMATION_LINK_TOKEN_PATTERN, { message: "token has an invalid format" })
   token?: string;
 }
