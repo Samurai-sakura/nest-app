@@ -14,12 +14,15 @@ const AUDITED_FIELDS = ["displayName", "email", "status"];
 interface Operation {
   name: string;
   kind: "read" | "update";
+  fields?: string;
 }
 
 const OPERATIONS: Record<string, Operation> = {
   getUser: { name: "users.profile", kind: "read" },
   getPhoto: { name: "users.photo", kind: "read" },
   updateProfile: { name: "users.update", kind: "update" },
+  setPhoto: { name: "users.photo.update", kind: "update", fields: "photo" },
+  deletePhoto: { name: "users.photo.clear", kind: "update", fields: "photo" },
 };
 
 const READ_RESULTS: Record<number, { result: string; withTarget: boolean }> = {
@@ -34,11 +37,18 @@ const UPDATE_RESULTS: Record<number, string> = {
   403: "forbidden",
   404: "not_found",
   409: "conflict",
+  413: "too_large",
+  415: "unsupported",
   429: "rate_limited",
   503: "unavailable",
 };
 
 const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+
+const DEFAULT_ERROR_CODES: Record<number, string> = {
+  400: "validation_failed",
+  413: "payload_too_large",
+};
 
 @Injectable()
 export class UsersAuditInterceptor implements NestInterceptor {
@@ -46,6 +56,9 @@ export class UsersAuditInterceptor implements NestInterceptor {
 
   public intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const operation = OPERATIONS[context.getHandler().name];
+    if (!operation) {
+      return next.handle();
+    }
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     return operation.kind === "update"
@@ -96,7 +109,7 @@ export class UsersAuditInterceptor implements NestInterceptor {
     const targetUserId = rawTarget && USER_ID_PATTERN.test(rawTarget) ? rawTarget : "invalid";
     const actorUserId = request.userId ?? "unknown";
     const scope = targetUserId === actorUserId ? "self" : "foreign";
-    const event = `operation=${operation.name} scope=${scope} actorUserId=${actorUserId} targetUserId=${targetUserId} fields=${fieldNames(request.body)}`;
+    const event = `operation=${operation.name} scope=${scope} actorUserId=${actorUserId} targetUserId=${targetUserId} fields=${operation.fields ?? fieldNames(request.body)}`;
     const duration = () => `durationMs=${Date.now() - startedAt}`;
 
     return next.handle().pipe(
@@ -131,5 +144,5 @@ function errorCode(error: HttpException) {
   if (typeof body === "object" && body !== null && "code" in body) {
     return (body as { code: string }).code;
   }
-  return error.getStatus() === 400 ? "validation_failed" : "unknown";
+  return DEFAULT_ERROR_CODES[error.getStatus()] ?? "unknown";
 }

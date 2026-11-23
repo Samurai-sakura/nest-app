@@ -1,16 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
   HttpStatus,
   Injectable,
   Logger,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, IsNull, QueryFailedError, Repository } from "typeorm";
-import { createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import * as argon2 from "argon2";
 import { UserRegisterDto } from "../dto/user-register.dto";
 import { ConfirmRegistrationDto } from "../dto/confirm-registration.dto";
@@ -18,12 +15,23 @@ import { ResendConfirmationDto } from "../dto/resend-confirmation.dto";
 import { User } from "../../../users/entities/user.entity";
 import { RegistrationConfirmation } from "../entities/registration-confirmation.entity";
 import type { ConfirmationMethod } from "../../confirmation-method";
+import {
+  CONFIRMATION_MAX_ATTEMPTS,
+  CONFIRMATION_RESEND_AFTER_SECONDS,
+  CONFIRMATION_TTL_SECONDS,
+  generateSecret,
+  hashSecret,
+  secondsUntilResend,
+  secretMatches,
+} from "../../confirmation/confirmation-secret";
+import {
+  attemptsExhausted,
+  emailDeliveryFailed,
+  invalidConfirmation,
+  resendTooEarly,
+} from "../../confirmation/confirmation-errors";
 import { MailService } from "../../../mail/mail.service";
 import { UserRolesService } from "../../../access-control/rbac/services/user-roles.service";
-
-const CONFIRMATION_TTL_SECONDS = 600;
-const RESEND_AFTER_SECONDS = 60;
-const MAX_CODE_ATTEMPTS = 5;
 
 @Injectable()
 export class RegistrationService {
@@ -77,7 +85,7 @@ export class RegistrationService {
     const method = this.config.getOrThrow<ConfirmationMethod>(
       "REGISTRATION_CONFIRM_METHOD",
     );
-    const secret = this.generateSecret(method);
+    const secret = generateSecret(method);
 
     let user: User;
     let attempt: RegistrationConfirmation;
@@ -94,7 +102,7 @@ export class RegistrationService {
           manager.create(RegistrationConfirmation, {
             userId: user.id,
             method,
-            secretHash: this.hmac(secret),
+            secretHash: hashSecret(this.hmacKey(), secret),
             expiresAt: new Date(Date.now() + CONFIRMATION_TTL_SECONDS * 1000),
           }),
         );
@@ -116,11 +124,7 @@ export class RegistrationService {
       this.logger.error(
         `Confirmation send failed attemptId=${attempt.id} method=${method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "email_delivery_failed",
-        message: "Failed to send confirmation email",
-      });
+      throw emailDeliveryFailed();
     }
 
     await this.confirmationRepository.update(attempt.id, {
@@ -146,19 +150,15 @@ export class RegistrationService {
         return { status: "no_pending" as const };
       }
 
-      if (
-        attempt.lastSentAt &&
-        Date.now() - attempt.lastSentAt.getTime() < RESEND_AFTER_SECONDS * 1000
-      ) {
-        return { status: "too_early" as const, attemptId: attempt.id };
+      const wait = attempt.lastSentAt ? secondsUntilResend(attempt.lastSentAt) : 0;
+      if (wait > 0) {
+        return { status: "too_early" as const, wait, attemptId: attempt.id };
       }
 
-      // способ берём из попытки, а не из текущей настройки
-      const secret = this.generateSecret(attempt.method);
+      const secret = generateSecret(attempt.method);
       const previousLastSentAt = attempt.lastSentAt;
-      // lastSentAt ставим сразу, чтобы параллельный resend получил 429
       await manager.update(RegistrationConfirmation, attempt.id, {
-        secretHash: this.hmac(secret),
+        secretHash: hashSecret(this.hmacKey(), secret),
         failedAttempts: 0,
         expiresAt: new Date(Date.now() + CONFIRMATION_TTL_SECONDS * 1000),
         lastSentAt: new Date(),
@@ -185,32 +185,20 @@ export class RegistrationService {
       this.logger.warn(
         `Resend rejected reason=too_early attemptId=${result.attemptId}`,
       );
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          code: "resend_too_early",
-          message: "Resend is allowed once per 60 seconds",
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw resendTooEarly(result.wait);
     }
 
     const { attempt, email, secret, previousLastSentAt } = result;
     try {
       await this.sendConfirmation(email, attempt.method, secret);
     } catch (error) {
-      // письмо не ушло: возвращаем lastSentAt, чтобы можно было повторить сразу
       await this.confirmationRepository.update(attempt.id, {
         lastSentAt: previousLastSentAt,
       });
       this.logger.error(
         `Confirmation send failed attemptId=${attempt.id} method=${attempt.method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "email_delivery_failed",
-        message: "Failed to send confirmation email",
-      });
+      throw emailDeliveryFailed();
     }
 
     this.logger.log(
@@ -225,7 +213,7 @@ export class RegistrationService {
       method,
       attemptId,
       expiresInSeconds: CONFIRMATION_TTL_SECONDS,
-      resendAfterSeconds: RESEND_AFTER_SECONDS,
+      resendAfterSeconds: CONFIRMATION_RESEND_AFTER_SECONDS,
     };
   }
 
@@ -251,7 +239,7 @@ export class RegistrationService {
     return this.confirmAttempt("magic_link", (attempts) =>
       attempts.findOne({
         where: {
-          secretHash: this.hmac(token),
+          secretHash: hashSecret(this.hmacKey(), token),
           method: "magic_link",
           consumedAt: IsNull(),
         },
@@ -284,14 +272,11 @@ export class RegistrationService {
       }
 
       if (attempt.method === "otp") {
-        if (attempt.failedAttempts >= MAX_CODE_ATTEMPTS) {
+        if (attempt.failedAttempts >= CONFIRMATION_MAX_ATTEMPTS) {
           return { status: "exhausted" as const, attemptId: attempt.id };
         }
 
-        const matches = timingSafeEqual(
-          Buffer.from(this.hmac(code!), "hex"),
-          Buffer.from(attempt.secretHash, "hex"),
-        );
+        const matches = secretMatches(this.hmacKey(), code!, attempt.secretHash);
         if (!matches) {
           await attempts.increment({ id: attempt.id }, "failedAttempts", 1);
           return { status: "wrong_code" as const, attemptId: attempt.id };
@@ -314,21 +299,10 @@ export class RegistrationService {
 
     // клиенту причины не различаем: всё, кроме исчерпанного лимита, — одинаковый 400
     if (result.status === "exhausted") {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          code: "attempts_exhausted",
-          message: "Too many attempts",
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw attemptsExhausted();
     }
     if (result.status !== "ok") {
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        code: "invalid_confirmation",
-        message: "Invalid or expired confirmation code",
-      });
+      throw invalidConfirmation();
     }
 
     this.logger.log(
@@ -341,19 +315,8 @@ export class RegistrationService {
     };
   }
 
-  private generateSecret(method: ConfirmationMethod): string {
-    return method === "otp"
-      ? randomInt(0, 1_000_000).toString().padStart(6, "0")
-      : randomBytes(32).toString("base64url");
-  }
-
-  private hmac(value: string): string {
-    return createHmac(
-      "sha256",
-      this.config.getOrThrow<string>("CONFIRMATION_HMAC_SECRET"),
-    )
-      .update(value)
-      .digest("hex");
+  private hmacKey() {
+    return this.config.getOrThrow<string>("CONFIRMATION_HMAC_SECRET");
   }
 
   private async sendConfirmation(

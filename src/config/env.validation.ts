@@ -6,6 +6,7 @@ const SECRET_KEYS = [
   "JWT_REFRESH_SECRET",
   "LOGIN_CHALLENGE_HMAC_KEY",
   "LOG_EMAIL_HMAC_KEY",
+  "EMAIL_CHANGE_HMAC_KEY",
 ];
 
 const REQUIRED_KEYS = [
@@ -34,6 +35,15 @@ const BOOLEAN_KEYS = [
 const METHOD_KEYS = [
   "REGISTRATION_CONFIRM_METHOD",
   "LOGIN_EMAIL_CONFIRMATION_METHOD",
+  "EMAIL_CHANGE_METHOD",
+];
+
+const S3_REQUIRED_KEYS = [
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_BUCKET",
+  "S3_ACCESS_KEY_ID",
+  "S3_SECRET_ACCESS_KEY",
 ];
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
@@ -105,6 +115,26 @@ export function validateEnv(config: Record<string, unknown>) {
     !LOCAL_HOSTS.has(publicApiBaseUrl.hostname)
   ) {
     errors.push("PUBLIC_API_BASE_URL must use https outside localhost");
+  }
+
+  const storageDriver = read("PHOTO_STORAGE_DRIVER") || "local";
+  if (!["local", "s3"].includes(storageDriver)) {
+    errors.push("PHOTO_STORAGE_DRIVER must be local or s3");
+  } else if (storageDriver === "local" && read("NODE_ENV") === "production") {
+    errors.push("PHOTO_STORAGE_DRIVER must be s3 when NODE_ENV is production");
+  }
+  if (storageDriver === "s3") {
+    for (const key of S3_REQUIRED_KEYS) {
+      if (!read(key).trim()) {
+        errors.push(`${key} is required for PHOTO_STORAGE_DRIVER=s3`);
+      }
+    }
+    if (read("S3_ENDPOINT") && !parseHttpUrl(read("S3_ENDPOINT"))) {
+      errors.push("S3_ENDPOINT must be an http(s) URL");
+    }
+  }
+  if (read("S3_CREATE_BUCKET") && !["true", "false"].includes(read("S3_CREATE_BUCKET"))) {
+    errors.push("S3_CREATE_BUCKET must be true or false");
   }
 
   const adminUserId = read("RBAC_BOOTSTRAP_ADMIN_USER_ID");

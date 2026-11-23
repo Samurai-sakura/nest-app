@@ -1,26 +1,31 @@
-import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, EntityManager, IsNull, Repository } from "typeorm";
-import { createHmac, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { User } from "../../../users/entities/user.entity";
 import { LoginChallenge } from "../entities/login-challenge.entity";
 import type { ConfirmationMethod } from "../../confirmation-method";
-import { ConfirmLoginDto, LOGIN_LINK_TOKEN_PATTERN } from "../dto/confirm-login.dto";
+import {
+  CONFIRMATION_LINK_TOKEN_PATTERN,
+  CONFIRMATION_MAX_ATTEMPTS,
+  CONFIRMATION_RESEND_AFTER_SECONDS,
+  CONFIRMATION_TTL_SECONDS,
+  generateSecret,
+  hashSecret,
+  isExpired,
+  secondsUntilResend,
+  secretMatches,
+} from "../../confirmation/confirmation-secret";
+import {
+  attemptsExhausted,
+  emailDeliveryFailed,
+  invalidConfirmation,
+  resendTooEarly,
+} from "../../confirmation/confirmation-errors";
+import { ConfirmLoginDto } from "../dto/confirm-login.dto";
 import { MailService } from "../../../mail/mail.service";
-import { invalidCredentials } from "../helpers/auth-errors";
+import { invalidCredentials, loginUnavailable } from "../helpers/auth-errors";
 import { TokenPair, TokenService } from "./token.service";
-
-export const LOGIN_CHALLENGE_TTL_SECONDS = 600;
-export const LOGIN_RESEND_AFTER_SECONDS = 60;
-const MAX_CODE_ATTEMPTS = 5;
 
 export interface LoginChallengeResponse {
   confirmationRequired: true;
@@ -49,9 +54,8 @@ export class LoginChallengeService {
     const method = this.config.getOrThrow<ConfirmationMethod>(
       "LOGIN_EMAIL_CONFIRMATION_METHOD",
     );
-    const secret = this.generateSecret(method);
+    const secret = generateSecret(method);
 
-    // пользователь блокируется раньше попытки; письмо уходит только после фиксации
     const result = await this.runTransaction(async (manager) => {
       const user = await this.lockUser(manager, userId);
       if (!user || user.status !== "active") {
@@ -63,7 +67,7 @@ export class LoginChallengeService {
         lock: { mode: "pessimistic_write" },
       });
       if (previous) {
-        const wait = this.secondsUntilResend(previous);
+        const wait = secondsUntilResend(previous.lastSentAt);
         if (wait > 0) {
           return { status: "too_early" as const, wait, attemptId: previous.id };
         }
@@ -77,7 +81,7 @@ export class LoginChallengeService {
         manager.create(LoginChallenge, {
           userId,
           method,
-          secretHash: this.hmac(secret),
+          secretHash: hashSecret(this.hmacKey(), secret),
           lastSentAt: new Date(),
         }),
       );
@@ -92,7 +96,7 @@ export class LoginChallengeService {
       this.logger.warn(
         `Login challenge rejected reason=too_early userId=${userId} attemptId=${result.attemptId}`,
       );
-      throw this.tooEarly(result.wait);
+      throw resendTooEarly(result.wait);
     }
 
     const { attempt, email } = result;
@@ -106,14 +110,11 @@ export class LoginChallengeService {
       this.logger.error(
         `Login challenge send failed attemptId=${attempt.id} method=${method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "email_delivery_failed",
-        message: "Failed to send confirmation email",
+      throw emailDeliveryFailed({
         confirmationRequired: true,
         method,
         attemptId: attempt.id,
-        retryAfterSeconds: LOGIN_RESEND_AFTER_SECONDS,
+        retryAfterSeconds: CONFIRMATION_RESEND_AFTER_SECONDS,
       });
     }
 
@@ -122,24 +123,23 @@ export class LoginChallengeService {
       confirmationRequired: true,
       method,
       attemptId: attempt.id,
-      expiresInSeconds: LOGIN_CHALLENGE_TTL_SECONDS,
-      resendAfterSeconds: LOGIN_RESEND_AFTER_SECONDS,
+      expiresInSeconds: CONFIRMATION_TTL_SECONDS,
+      resendAfterSeconds: CONFIRMATION_RESEND_AFTER_SECONDS,
     };
   }
 
   public async confirm(dto: ConfirmLoginDto): Promise<TokenPair> {
     const input = this.parseConfirmation(dto);
     if (!input) {
-      throw this.invalidConfirmation();
+      throw invalidConfirmation();
     }
     const { attemptId, secret, method } = input;
     const owner = await this.findOwner(attemptId);
     if (!owner) {
       this.logger.warn(`Login confirmation failed method=${method} reason=not_found`);
-      throw this.invalidConfirmation();
+      throw invalidConfirmation();
     }
 
-    // подпись токенов внутри транзакции: при ошибке попытка откатывается и остаётся годной
     const result = await this.runTransaction(async (manager) => {
       const user = await this.lockUser(manager, owner.userId);
       const attempt = await this.lockAttempt(manager, attemptId);
@@ -153,7 +153,7 @@ export class LoginChallengeService {
       if (attempt.consumedAt) {
         return { status: "consumed" as const };
       }
-      if (this.isExpired(attempt)) {
+      if (isExpired(attempt.lastSentAt)) {
         return { status: "expired" as const };
       }
       if (!user || user.status !== "active") {
@@ -161,20 +161,20 @@ export class LoginChallengeService {
         return { status: "user_inactive" as const };
       }
 
-      if (!this.secretMatches(secret, attempt.secretHash)) {
+      if (!secretMatches(this.hmacKey(), secret, attempt.secretHash)) {
         if (method === "magic_link") {
           return { status: "wrong_secret" as const };
         }
         const attempts = attempt.attempts + 1;
         await manager.update(LoginChallenge, attempt.id, {
           attempts,
-          ...(attempts >= MAX_CODE_ATTEMPTS && {
+          ...(attempts >= CONFIRMATION_MAX_ATTEMPTS && {
             consumedAt: new Date(),
             consumedReason: "attempts_exhausted" as const,
           }),
         });
         return {
-          status: attempts >= MAX_CODE_ATTEMPTS
+          status: attempts >= CONFIRMATION_MAX_ATTEMPTS
             ? ("attempts_exhausted_now" as const)
             : ("wrong_secret" as const),
         };
@@ -191,13 +191,13 @@ export class LoginChallengeService {
       );
     }
     if (result.status === "exhausted") {
-      throw this.attemptsExhausted();
+      throw attemptsExhausted();
     }
     if (result.status === "user_inactive") {
       throw invalidCredentials();
     }
     if (result.status !== "confirmed") {
-      throw this.invalidConfirmation();
+      throw invalidConfirmation();
     }
 
     this.logger.log(
@@ -210,7 +210,7 @@ export class LoginChallengeService {
     const owner = await this.findOwner(attemptId);
     if (!owner) {
       this.logger.warn("Login resend rejected reason=not_found");
-      throw this.invalidConfirmation();
+      throw invalidConfirmation();
     }
 
     const result = await this.runTransaction(async (manager) => {
@@ -230,16 +230,16 @@ export class LoginChallengeService {
         await this.consume(manager, attempt.id, "user_inactive");
         return { status: "user_inactive" as const };
       }
-      const wait = this.secondsUntilResend(attempt);
+      const wait = secondsUntilResend(attempt.lastSentAt);
       if (wait > 0) {
         return { status: "too_early" as const, wait };
       }
 
       // истёкший срок не мешает resend: новый секрет заново запускает TTL
-      const secret = this.generateSecret(attempt.method);
+      const secret = generateSecret(attempt.method);
       const lastSentAt = new Date();
       await manager.update(LoginChallenge, attempt.id, {
-        secretHash: this.hmac(secret),
+        secretHash: hashSecret(this.hmacKey(), secret),
         lastSentAt,
         attempts: 0,
       });
@@ -257,16 +257,16 @@ export class LoginChallengeService {
       );
     }
     if (result.status === "exhausted") {
-      throw this.attemptsExhausted();
+      throw attemptsExhausted();
     }
     if (result.status === "too_early") {
-      throw this.tooEarly(result.wait);
+      throw resendTooEarly(result.wait);
     }
     if (result.status === "user_inactive") {
       throw invalidCredentials();
     }
     if (result.status !== "ok") {
-      throw this.invalidConfirmation();
+      throw invalidConfirmation();
     }
 
     const { attempt, email, secret } = result;
@@ -277,11 +277,8 @@ export class LoginChallengeService {
       this.logger.error(
         `Login challenge send failed attemptId=${attempt.id} method=${attempt.method}: ${(error as Error).message}`,
       );
-      throw new ServiceUnavailableException({
-        statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-        code: "email_delivery_failed",
-        message: "Failed to send confirmation email",
-        retryAfterSeconds: LOGIN_RESEND_AFTER_SECONDS,
+      throw emailDeliveryFailed({
+        retryAfterSeconds: CONFIRMATION_RESEND_AFTER_SECONDS,
       });
     }
 
@@ -291,14 +288,14 @@ export class LoginChallengeService {
     return {
       method: attempt.method,
       attemptId: attempt.id,
-      expiresInSeconds: LOGIN_CHALLENGE_TTL_SECONDS,
-      resendAfterSeconds: LOGIN_RESEND_AFTER_SECONDS,
+      expiresInSeconds: CONFIRMATION_TTL_SECONDS,
+      resendAfterSeconds: CONFIRMATION_RESEND_AFTER_SECONDS,
     };
   }
 
   private parseConfirmation(dto: ConfirmLoginDto) {
     if (dto.token !== undefined) {
-      const match = LOGIN_LINK_TOKEN_PATTERN.exec(dto.token);
+      const match = CONFIRMATION_LINK_TOKEN_PATTERN.exec(dto.token);
       return match
         ? { attemptId: match[1], secret: match[2], method: "magic_link" as const }
         : null;
@@ -314,7 +311,7 @@ export class LoginChallengeService {
       });
     } catch (error) {
       this.logger.error(`Login challenge lookup failed: ${(error as Error).message}`);
-      throw new ServiceUnavailableException("Login is temporarily unavailable");
+      throw loginUnavailable();
     }
   }
 
@@ -323,7 +320,7 @@ export class LoginChallengeService {
       return await this.dataSource.transaction(work);
     } catch (error) {
       this.logger.error(`Login challenge transaction failed: ${(error as Error).message}`);
-      throw new ServiceUnavailableException("Login is temporarily unavailable");
+      throw loginUnavailable();
     }
   }
 
@@ -353,68 +350,8 @@ export class LoginChallengeService {
     });
   }
 
-  private isExpired(attempt: LoginChallenge) {
-    return (
-      attempt.lastSentAt.getTime() + LOGIN_CHALLENGE_TTL_SECONDS * 1000 < Date.now()
-    );
-  }
-
-  private secondsUntilResend(attempt: LoginChallenge) {
-    const readyAt = attempt.lastSentAt.getTime() + LOGIN_RESEND_AFTER_SECONDS * 1000;
-    return Math.max(0, Math.ceil((readyAt - Date.now()) / 1000));
-  }
-
-  private tooEarly(wait: number) {
-    return new HttpException(
-      {
-        statusCode: HttpStatus.TOO_MANY_REQUESTS,
-        code: "resend_too_early",
-        message: `Email can be requested again in ${wait} seconds`,
-        retryAfterSeconds: wait,
-      },
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
-  }
-
-  private invalidConfirmation() {
-    return new BadRequestException({
-      statusCode: HttpStatus.BAD_REQUEST,
-      code: "invalid_confirmation",
-      message: "Invalid or expired confirmation code",
-    });
-  }
-
-  private attemptsExhausted() {
-    return new HttpException(
-      {
-        statusCode: HttpStatus.TOO_MANY_REQUESTS,
-        code: "attempts_exhausted",
-        message: "Too many attempts",
-      },
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
-  }
-
-  private generateSecret(method: ConfirmationMethod) {
-    return method === "otp"
-      ? randomInt(0, 1_000_000).toString().padStart(6, "0")
-      : randomBytes(32).toString("base64url");
-  }
-
-  private hmac(value: string) {
-    return createHmac(
-      "sha256",
-      this.config.getOrThrow<string>("LOGIN_CHALLENGE_HMAC_KEY"),
-    )
-      .update(value)
-      .digest("hex");
-  }
-
-  private secretMatches(secret: string, storedHash: string) {
-    return timingSafeEqual(
-      Buffer.from(this.hmac(secret), "hex"),
-      Buffer.from(storedHash, "hex"),
-    );
+  private hmacKey() {
+    return this.config.getOrThrow<string>("LOGIN_CHALLENGE_HMAC_KEY");
   }
 
   private async send(email: string, attempt: LoginChallenge, secret: string) {

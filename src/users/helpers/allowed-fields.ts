@@ -1,4 +1,5 @@
 import { BadRequestException, HttpStatus } from "@nestjs/common";
+import { emptyUpdate } from "./users-errors";
 
 const ALLOWED_FIELDS = ['displayName', 'email', 'status'];
 
@@ -14,11 +15,7 @@ export function checkAllowedFields(body: unknown) {
   const keys = Object.keys(body);
 
   if (keys.length === 0) {
-    throw new BadRequestException({
-      statusCode: HttpStatus.BAD_REQUEST,
-      code: "empty_update",
-      message: "At least one field is required",
-    });
+    throw emptyUpdate();
   }
 
   const wrongKeys = keys.filter((key: string) => !ALLOWED_FIELDS.includes(key));

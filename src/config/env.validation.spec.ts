@@ -19,11 +19,13 @@ function validEnv(): Record<string, string> {
     REGISTRATION_RATE_TTL_SECONDS: "60",
     LOGIN_EMAIL_CONFIRMATION_ENABLED: "false",
     LOGIN_EMAIL_CONFIRMATION_METHOD: "magic_link",
+    EMAIL_CHANGE_METHOD: "otp",
     CONFIRMATION_HMAC_SECRET: secret("a"),
     JWT_ACCESS_SECRET: secret("b"),
     JWT_REFRESH_SECRET: secret("c"),
     LOGIN_CHALLENGE_HMAC_KEY: secret("d"),
     LOG_EMAIL_HMAC_KEY: secret("e"),
+    EMAIL_CHANGE_HMAC_KEY: secret("f"),
     JWT_ISSUER: "backend-app",
     JWT_AUDIENCE: "backend-app",
     SMTP_HOST: "localhost",
@@ -59,6 +61,7 @@ describe("validateEnv", () => {
     "JWT_REFRESH_SECRET",
     "LOGIN_CHALLENGE_HMAC_KEY",
     "LOG_EMAIL_HMAC_KEY",
+    "EMAIL_CHANGE_HMAC_KEY",
   ])("rejects %s that is missing or shorter than 32 bytes", (key) => {
     expect(errorFor({ [key]: undefined })).toContain(
       `${key} must be at least 32 bytes`,
@@ -128,7 +131,11 @@ describe("validateEnv", () => {
     },
   );
 
-  it.each(["REGISTRATION_CONFIRM_METHOD", "LOGIN_EMAIL_CONFIRMATION_METHOD"])(
+  it.each([
+    "REGISTRATION_CONFIRM_METHOD",
+    "LOGIN_EMAIL_CONFIRMATION_METHOD",
+    "EMAIL_CHANGE_METHOD",
+  ])(
     "accepts only otp or magic_link for %s",
     (key) => {
       expect(errorFor({ [key]: "sms" })).toContain(
@@ -203,5 +210,62 @@ describe("validateEnv", () => {
     expect(errorFor({ RBAC_BOOTSTRAP_ADMIN_USER_ID: "admin" })).toContain(
       "RBAC_BOOTSTRAP_ADMIN_USER_ID must be a user id (uuid)",
     );
+  });
+
+  describe("photo storage", () => {
+    const s3 = {
+      PHOTO_STORAGE_DRIVER: "s3",
+      S3_ENDPOINT: "http://localhost:9000",
+      S3_REGION: "us-east-1",
+      S3_BUCKET: "backend-app-photos",
+      S3_ACCESS_KEY_ID: "BACKENDAPPDEV",
+      S3_SECRET_ACCESS_KEY: "BACKENDAPPDEVSECRET2026",
+    };
+
+    it("uses the local folder when the driver is not set", () => {
+      expect(errorFor({ PHOTO_STORAGE_DRIVER: undefined })).toBeNull();
+    });
+
+    it("accepts a complete S3 configuration", () => {
+      expect(errorFor({ ...s3, S3_CREATE_BUCKET: "true" })).toBeNull();
+    });
+
+    it("rejects an unknown driver", () => {
+      expect(errorFor({ PHOTO_STORAGE_DRIVER: "ftp" })).toContain(
+        "PHOTO_STORAGE_DRIVER must be local or s3",
+      );
+    });
+
+    it("requires S3 in production", () => {
+      expect(errorFor({ NODE_ENV: "production" })).toContain(
+        "PHOTO_STORAGE_DRIVER must be s3 when NODE_ENV is production",
+      );
+      expect(errorFor({ ...s3, NODE_ENV: "production" })).toBeNull();
+    });
+
+    it.each(Object.keys(s3).filter((key) => key !== "PHOTO_STORAGE_DRIVER"))(
+      "requires %s for the S3 driver",
+      (key) => {
+        expect(errorFor({ ...s3, [key]: undefined })).toContain(
+          `${key} is required for PHOTO_STORAGE_DRIVER=s3`,
+        );
+      },
+    );
+
+    it("rejects an S3 endpoint that is not an http(s) URL", () => {
+      expect(errorFor({ ...s3, S3_ENDPOINT: "localhost:9000" })).toContain(
+        "S3_ENDPOINT must be an http(s) URL",
+      );
+    });
+
+    it("rejects S3_CREATE_BUCKET other than true or false", () => {
+      expect(errorFor({ ...s3, S3_CREATE_BUCKET: "yes" })).toContain(
+        "S3_CREATE_BUCKET must be true or false",
+      );
+    });
+
+    it("does not put the S3 secret into the message", () => {
+      expect(errorFor({ ...s3, S3_ENDPOINT: "bad" })).not.toContain("BACKENDAPPDEVSECRET2026");
+    });
   });
 });

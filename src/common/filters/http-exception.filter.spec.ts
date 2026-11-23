@@ -4,6 +4,7 @@ import {
   ConflictException,
   HttpException,
   Logger,
+  PayloadTooLargeException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ThrottlerException } from "@nestjs/throttler";
@@ -42,6 +43,7 @@ describe("HttpExceptionFilter", () => {
     [new BadRequestException("Bad input"), 400, "bad_request"],
     [new ConflictException("Taken"), 409, "conflict"],
     [new ServiceUnavailableException("Down"), 503, "service_unavailable"],
+    [new PayloadTooLargeException("File too large"), 413, "payload_too_large"],
     [new HttpException("Teapot", 418), 418, "error"],
   ])("adds a default code by status to %p", (exception, status, code) => {
     const result = run(exception);
